@@ -275,7 +275,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     Future.microtask(_loadSessions);
   }
 
-  // Optimistic start: update UI immediately, persist in background, then reconcile.
   void _startSession() {
     final now = DateTime.now();
     final newSession = WorkSession(start: now, notes: null);
@@ -283,32 +282,12 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     _refresh();
   }
 
-  // Optimistic end: update model locally, persist in background, then reconcile.
   void _endSession() {
     final open = _findOpenSession(_sessions);
     if (open == null) return;
 
-    // If WorkSession fields are immutable, create a new instance with the updated end.
-    final updated = WorkSession(
-      start: open.start,
-      end: DateTime.now(),
-      notes: open.notes,
-    );
-    // Replace locally and persist
-    setState(() {
-      // create a mutable copy before modifying
-      final mutable = [..._sessions];
-      final idx = mutable.indexWhere((s) => identical(s, open) || (s.start == open.start && s.end == open.end));
-      if (idx != -1) {
-        mutable[idx] = updated;
-      } else {
-        mutable.add(updated);
-      }
-      _sessions = mutable;
-      _cachedDayGroups = _buildDayGroups(_sessions, _findOpenSession(_sessions));
-      _cachedGrandTotalHours = _computeGrandTotalHours(_sessions);
-    });
-    widget.repository.updateSession(updated);
+    open.end = DateTime.now();
+    widget.repository.updateSession(open);
     _refresh();
   }
 
@@ -459,223 +438,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     return TimeEntryTile(
       key: ValueKey('${segment.date.toIso8601String()}_${segment.start.toIso8601String()}'),
       segment: segment,
-      onEdit: (seg) => _showEditSessionSheet(context, seg),
-    );
-  }
-
-  // Step B: modal editor for a session segment
-  Future<void> _showEditSessionSheet(BuildContext context, _SessionSegment segment) async {
-    // Try to find the original WorkSession that produced this segment.
-    WorkSession? session;
-    try {
-      session = _sessions.firstWhere((s) =>
-      s.start == segment.start ||
-          (s.end != null && segment.end == s.end) ||
-          (s.notes != null && s.notes == segment.notes)
-      );
-    } catch (_) {
-      // If we can't find an exact match, fall back to the first session that overlaps the segment date.
-      try {
-        session = _sessions.firstWhere((s) =>
-        s.start.year == segment.date.year &&
-            s.start.month == segment.date.month &&
-            s.start.day == segment.date.day
-        );
-      } catch (_) {
-        session = null;
-      }
-    }
-
-    if (session == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to locate session to edit.')),
-      );
-      return;
-    }
-
-    DateTime editedStart = session.start;
-    DateTime? editedEnd = session.end;
-    final notesController = TextEditingController(text: session.notes ?? '');
-
-    // Intentionally avoid modifying the system clipboard to prevent "Copied" overlays.
-    // Instead, reduce keyboard suggestions and disable interactive paste/copy in the notes field.
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: StatefulBuilder(
-            builder: (context, setModalState) {
-              Future<void> pickDateTime(bool isStart) async {
-                final initial = isStart ? editedStart : (editedEnd ?? editedStart);
-                final pickedDate = await showDatePicker(
-                  context: context,
-                  initialDate: initial,
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime(2100),
-                );
-                if (pickedDate == null) return;
-                final pickedTime = await showTimePicker(
-                  context: context,
-                  initialTime: TimeOfDay.fromDateTime(initial),
-                );
-                if (pickedTime == null) return;
-                final combined = DateTime(
-                  pickedDate.year,
-                  pickedDate.month,
-                  pickedDate.day,
-                  pickedTime.hour,
-                  pickedTime.minute,
-                );
-                setModalState(() {
-                  if (isStart) {
-                    editedStart = combined;
-                  } else {
-                    editedEnd = combined;
-                  }
-                });
-              }
-
-              String fmt(DateTime dt) => _timeFormatter.format(dt);
-
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: Text('Edit Session', style: Theme.of(context).textTheme.titleMedium)),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ListTile(
-                      title: const Text('Start'),
-                      subtitle: Text(fmt(editedStart)),
-                      trailing: TextButton(
-                        onPressed: () => pickDateTime(true),
-                        child: const Text('Change'),
-                      ),
-                    ),
-                    ListTile(
-                      title: const Text('End'),
-                      subtitle: Text(editedEnd != null ? fmt(editedEnd!) : 'In progress'),
-                      trailing: TextButton(
-                        onPressed: () => pickDateTime(false),
-                        child: const Text('Change'),
-                      ),
-                    ),
-                    // Notes TextField: disable suggestions and autofill and disable
-                    // interactive paste/copy to avoid filename/clipboard suggestions appearing.
-                    TextField(
-                      controller: notesController,
-                      decoration: const InputDecoration(labelText: 'Notes'),
-                      maxLines: null,
-                      keyboardType: TextInputType.text,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.done,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      autofillHints: const <String>[],
-                      // Disable interactive selection so the keyboard won't surface paste suggestions.
-                      enableInteractiveSelection: false,
-                      // Disable toolbar options (copy/cut/paste/selectAll)
-                      toolbarOptions: const ToolbarOptions(
-                        copy: false,
-                        cut: false,
-                        paste: false,
-                        selectAll: false,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Cancel'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Validate
-                              if (editedEnd != null && editedEnd!.isBefore(editedStart)) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('End must be after start.')),
-                                );
-                                return;
-                              }
-
-                              // Build a new WorkSession instance with the edited values.
-                              // IMPORTANT: If your WorkSession requires additional fields
-                              // (for example an id or projectId), include them here by copying
-                              // from the original `session` (e.g. id: session.id).
-                              final updatedSession = WorkSession(
-                                start: editedStart,
-                                end: editedEnd,
-                                notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                              );
-
-                              // Replace the old session in the local list with the updated one
-                              setState(() {
-                                final mutable = [..._sessions];
-                                final idx = mutable.indexWhere((s) => identical(s, session) || (s.start == session!.start && (s.end == session.end)));
-                                if (idx != -1) {
-                                  mutable[idx] = updatedSession;
-                                } else {
-                                  // Fallback: if we couldn't find exact match, try replacing by date match
-                                  final idxByDate = mutable.indexWhere((s) =>
-                                  s.start.year == session!.start.year &&
-                                      s.start.month == session!.start.month &&
-                                      s.start.day == session!.start.day
-                                  );
-                                  if (idxByDate != -1) {
-                                    mutable[idxByDate] = updatedSession;
-                                  } else {
-                                    // If still not found, append (safe fallback)
-                                    mutable.add(updatedSession);
-                                  }
-                                }
-
-                                _sessions = mutable;
-                                _cachedDayGroups = _buildDayGroups(_sessions, _findOpenSession(_sessions));
-                                _cachedGrandTotalHours = _computeGrandTotalHours(_sessions);
-                              });
-
-                              // Persist the updated session in background
-                              widget.repository.updateSession(updatedSession);
-
-                              Navigator.of(context).pop();
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Session updated')),
-                              );
-
-                              // Reconcile with repository in background
-                              Future.microtask(_loadSessions);
-                            },
-                            child: const Text('Save'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
     );
   }
 
@@ -751,22 +513,22 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   }
 }
 
-// --- Extracted widget for session rows ---
+// --- New extracted widget for session rows ---
+// Placed after the State class to keep the file organized.
 class TimeEntryTile extends StatelessWidget {
   final _SessionSegment segment;
-  final ValueChanged<_SessionSegment> onEdit;
-  static final DateFormat _timeFmt = DateFormat('h:mm a');
 
   const TimeEntryTile({
     required this.segment,
-    required this.onEdit,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final startStr = _timeFmt.format(segment.start);
-    final endStr = _timeFmt.format(segment.end);
+    // Use a local formatter to avoid depending on the parent's private formatter.
+    final timeFmt = DateFormat('h:mm a');
+    final startStr = timeFmt.format(segment.start);
+    final endStr = timeFmt.format(segment.end);
     final hoursStr = segment.hoursDecimal.toStringAsFixed(2);
 
     return Padding(
@@ -783,25 +545,15 @@ class TimeEntryTile extends StatelessWidget {
           subtitle: segment.notes != null && segment.notes!.trim().isNotEmpty
               ? Text(segment.notes!.trim())
               : null,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$hoursStr h',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.edit, size: 20),
-                tooltip: 'Edit session',
-                onPressed: () => onEdit(segment),
-              ),
-            ],
+          trailing: Text(
+            '$hoursStr h',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
     );
   }
 }
+
