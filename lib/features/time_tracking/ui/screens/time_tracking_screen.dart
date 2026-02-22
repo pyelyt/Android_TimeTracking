@@ -171,6 +171,12 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   List<_DayGroup> _cachedDayGroups = [];
   double _cachedGrandTotalHours = 0.0;
 
+  /// 0 = current pay period, -1 = one period back, min = -4
+  int _focusedPeriodOffset = 0;
+
+  /// The pay period currently displayed in the UI (may differ from current).
+  Map<String, DateTime>? _focusedPayPeriodRange;
+
   @override
   void initState() {
     super.initState();
@@ -191,6 +197,8 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     setState(() {
       _settings = settings;
       _currentPayPeriodRange = range;
+      _focusedPayPeriodRange = range;
+      _focusedPeriodOffset = 0;
       _sessions = sessions;
       _cachedDayGroups = groups;
       _cachedGrandTotalHours = total;
@@ -228,6 +236,8 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     setState(() {
       _settings = s ?? PayPeriodSettings(mode: PayPeriodMode.weekly);
       _currentPayPeriodRange = computePayPeriodRange(_settings!);
+      _focusedPayPeriodRange = _currentPayPeriodRange;
+      _focusedPeriodOffset = 0;
     });
     await _loadSessions();
   }
@@ -236,8 +246,14 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     final sessions = await widget.repository.getAllAsync();
     if (!mounted) return;
 
-    final groups = _buildDayGroups(sessions, _findOpenSession(sessions));
-    final total = _computeGrandTotalHours(sessions);
+    // Filter sessions to the focused pay period for display
+    final focused = _focusedPayPeriodRange;
+    final filtered = focused != null
+        ? _filterSessionsByPeriod(sessions, focused)
+        : sessions;
+    final openSession = _focusedPeriodOffset == 0 ? _findOpenSession(sessions) : null;
+    final groups = _buildDayGroups(filtered, openSession);
+    final total = _computeGrandTotalHours(filtered);
 
     setState(() {
       _sessions = sessions;
@@ -252,6 +268,50 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   }
 
   void _refresh() {
+    Future.microtask(_loadSessions);
+  }
+
+  /// Filter sessions to those whose start falls within [period].
+  List<WorkSession> _filterSessionsByPeriod(
+      List<WorkSession> sessions, Map<String, DateTime> period) {
+    final start = period['start']!;
+    final end = DateTime(
+        period['end']!.year, period['end']!.month, period['end']!.day, 23, 59, 59);
+    return sessions
+        .where((s) => !s.start.isBefore(start) && !s.start.isAfter(end))
+        .toList();
+  }
+
+  /// Navigate the focused pay period by [delta] steps (-1 = back, +1 = forward).
+  void _navigatePeriod(int delta) {
+    if (_settings == null) return;
+    final newOffset = (_focusedPeriodOffset + delta).clamp(-4, 0);
+    if (newOffset == _focusedPeriodOffset) return;
+
+    // Compute the focused range by stepping back from today
+    DateTime ref = DateTime.now();
+    // Walk backwards: each step goes to the period before current
+    final currentRange = computePayPeriodRange(_settings!, now: ref);
+    DateTime stepRef = currentRange['start']!.subtract(const Duration(days: 1));
+
+    Map<String, DateTime> focusedRange = currentRange;
+    // offset 0 = current, -1 = one back, etc.
+    int stepsBack = -newOffset;
+    if (stepsBack == 0) {
+      focusedRange = currentRange;
+    } else {
+      stepRef = currentRange['start']!.subtract(const Duration(days: 1));
+      for (int i = 0; i < stepsBack; i++) {
+        focusedRange = computePayPeriodRange(_settings!, now: stepRef);
+        stepRef = focusedRange['start']!.subtract(const Duration(days: 1));
+      }
+    }
+
+    setState(() {
+      _focusedPeriodOffset = newOffset;
+      _focusedPayPeriodRange = focusedRange;
+    });
+
     Future.microtask(_loadSessions);
   }
 
@@ -296,13 +356,15 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   @override
   Widget build(BuildContext context) {
     final grandTotalHours = _cachedGrandTotalHours;
-    final openSession = _findOpenSession(_sessions);
+    final allSessions = _sessions;
+    final openSession = _findOpenSession(allSessions);
     final hasOpen = openSession != null;
     final dayGroups = _cachedDayGroups;
+    final isViewingCurrent = _focusedPeriodOffset == 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WorkTime Tracker'),
+        title: const Text('WorkTime Tracker', style: TextStyle(fontSize: 25.0, fontWeight: FontWeight.w600)),
         backgroundColor: const Color(0xFF00796B),
         foregroundColor: Colors.white,
         actions: [
@@ -338,7 +400,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                 await exporter.exportAndShare();
               } catch (e) {
                 if (!mounted) return;
-                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Export failed: $e')),
                 );
@@ -367,7 +428,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(grandTotalHours, hasOpen),
+          _buildHeader(grandTotalHours, hasOpen, isViewingCurrent),
           const Divider(height: 1),
           Expanded(
             child: dayGroups.isEmpty
@@ -385,22 +446,24 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             ),
           ),
           const Divider(height: 1),
-          _buildSingleStartEndButton(context, openSession),
+          _buildSingleStartEndButton(context, openSession, isViewingCurrent),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(double grandTotalHours, bool hasOpen) {
+  Widget _buildHeader(double grandTotalHours, bool hasOpen, bool isViewingCurrent) {
     final totalStr = grandTotalHours.toStringAsFixed(2);
 
+    // Use focused range for display, fall back to current
+    final displayRange = _focusedPayPeriodRange ?? _currentPayPeriodRange;
     String periodRange = '';
-    if (_settings != null && _currentPayPeriodRange != null) {
-      final start = _currentPayPeriodRange!['start'];
-      final end = _currentPayPeriodRange!['end'];
+    if (displayRange != null) {
+      final start = displayRange['start'];
+      final end = displayRange['end'];
       if (start != null && end != null) {
         periodRange =
-            '${_payPeriodFormatter.format(start)} – ${_payPeriodFormatter.format(end)}';
+        '${_payPeriodFormatter.format(start)} – ${_payPeriodFormatter.format(end)}';
       }
     }
 
@@ -409,71 +472,121 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     return Container(
       color: cardBg,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(8, 14, 16, 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left side: pay period label + date range
+          // Left side: pay period label + nav arrows + date range
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'PAY PERIOD',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                    color: Colors.grey.shade500,
-                  ),
+                // PAY PERIOD label with back/forward arrows
+                Row(
+                  children: [
+                    // Back arrow
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          Icons.chevron_left,
+                          size: 26,
+                          color: _focusedPeriodOffset > -4
+                              ? accentTeal
+                              : Colors.grey.shade300,
+                        ),
+                        onPressed: _focusedPeriodOffset > -4
+                            ? () => _navigatePeriod(-1)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      'PAY PERIOD',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    // Forward arrow — only shown when not on current
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          Icons.chevron_right,
+                          size: 26,
+                          color: !isViewingCurrent
+                              ? accentTeal
+                              : Colors.grey.shade300,
+                        ),
+                        onPressed: !isViewingCurrent
+                            ? () => _navigatePeriod(1)
+                            : null,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  periodRange.isNotEmpty ? periodRange : '—',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A2E),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    periodRange.isNotEmpty ? periodRange : '—',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A2E),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Session status pill
-                Container(
-                  padding:
+                // Session status pill — only show for current period
+                if (isViewingCurrent)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Container(
+                      padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: hasOpen
-                        ? const Color(0xFFE8F5E9)
-                        : const Color(0xFFEEEEEE),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: hasOpen
-                              ? const Color(0xFF43A047)
-                              : Colors.grey.shade400,
-                        ),
+                      decoration: BoxDecoration(
+                        color: hasOpen
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFEEEEEE),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(width: 5),
-                      Text(
-                        hasOpen ? 'Shift in progress' : 'No open shift',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: hasOpen
-                              ? const Color(0xFF2E7D32)
-                              : Colors.grey.shade600,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: hasOpen
+                                  ? const Color(0xFF43A047)
+                                  : Colors.grey.shade400,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            hasOpen ? 'Shift in progress' : 'No open shift',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: hasOpen
+                                  ? const Color(0xFF2E7D32)
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -493,7 +606,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
               const Text(
                 'hrs this period',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 17,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF78909C),
                 ),
@@ -632,7 +745,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                             child: Text('Edit Session',
                                 style: Theme.of(context)
                                     .textTheme
-                                    .titleMedium)),
+                                    .titleMedium?.copyWith(fontSize: 24))),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.of(context).pop(),
@@ -641,26 +754,26 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     ),
                     const SizedBox(height: 8),
                     ListTile(
-                      title: const Text('Start'),
-                      subtitle: Text(fmt(editedStart)),
+                      title: const Text('Start', style: TextStyle(fontSize: 21)),
+                      subtitle: Text(fmt(editedStart), style: const TextStyle(fontSize: 18)),
                       trailing: TextButton(
                         onPressed: () => pickDateTime(true),
-                        child: const Text('Change'),
+                        child: const Text('Change', style: TextStyle(fontSize: 21)),
                       ),
                     ),
                     ListTile(
-                      title: const Text('End'),
+                      title: const Text('End', style: TextStyle(fontSize: 21)),
                       subtitle: Text(editedEnd != null
                           ? fmt(editedEnd!)
-                          : 'In progress'),
+                          : 'In progress', style: const TextStyle(fontSize: 18)),
                       trailing: TextButton(
                         onPressed: () => pickDateTime(false),
-                        child: const Text('Change'),
+                        child: const Text('Change', style: TextStyle(fontSize: 21)),
                       ),
                     ),
                     TextField(
                       controller: notesController,
-                      decoration: const InputDecoration(labelText: 'Notes'),
+                      decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(fontSize: 21)),
                       maxLines: null,
                       keyboardType: TextInputType.visiblePassword, // suppresses suggestion/clipboard bar on Android
                       textCapitalization: TextCapitalization.sentences,
@@ -681,7 +794,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                             color: Colors.red, size: 18),
                         label: const Text(
                           'Delete Session',
-                          style: TextStyle(color: Colors.red),
+                          style: TextStyle(color: Colors.red, fontSize: 21),
                         ),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.red),
@@ -715,7 +828,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                           setState(() {
                             final mutable = [..._sessions];
                             mutable.removeWhere(
-                                (s) => s.start == originalSession.start);
+                                    (s) => s.start == originalSession.start);
                             _sessions = mutable;
                             _cachedDayGroups = _buildDayGroups(
                                 _sessions, _findOpenSession(_sessions));
@@ -724,10 +837,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                           });
 
                           widget.repository.removeSession(originalSession);
-                          if (!mounted) return;
-                          // ignore: use_build_context_synchronously
+
                           Navigator.of(context).pop();
-                          // ignore: use_build_context_synchronously
+
+                          if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                                 content: Text('Session deleted')),
@@ -743,7 +856,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Cancel'),
+                            child: const Text('Cancel', style: TextStyle(fontSize: 21)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -774,7 +887,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                               setState(() {
                                 final mutable = [..._sessions];
                                 final idx = mutable.indexWhere((s) =>
-                                    s.start == originalSession.start);
+                                s.start == originalSession.start);
                                 if (idx != -1) {
                                   mutable[idx] = updatedSession;
                                 } else {
@@ -802,7 +915,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
                               Future.microtask(_loadSessions);
                             },
-                            child: const Text('Save'),
+                            child: const Text('Save', style: TextStyle(fontSize: 21)),
                           ),
                         ),
                       ],
@@ -830,7 +943,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
         child: ListTile(
           dense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           leading: Container(
             width: 28,
             height: 28,
@@ -840,7 +953,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             ),
             child: const Icon(Icons.play_arrow, color: Colors.white, size: 18),
           ),
-          title: Text('$startStr → In progress'),
+          title: Text('$startStr → In progress', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
           subtitle: const Text('Current session'),
           trailing: Text(
             '-- h',
@@ -854,7 +967,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   }
 
   Widget _buildSingleStartEndButton(
-      BuildContext context, WorkSession? openSession) {
+      BuildContext context, WorkSession? openSession, bool isViewingCurrent) {
     final bool hasOpen = openSession != null;
     final String label = hasOpen ? 'End Shift' : 'Start Shift';
     final IconData icon = hasOpen ? Icons.stop : Icons.play_arrow;
@@ -862,38 +975,55 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     final VoidCallback onPressed = hasOpen ? _endSession : _startSession;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
+      padding: const EdgeInsets.fromLTRB(0, 6, 0, 14),
       alignment: Alignment.center,
-      child: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.33,
-        height: 48,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey.shade300,
-            foregroundColor: Colors.black,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: 1,
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: onPressed,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: iconColor, size: 22),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+      child: Column(
+        children: [
+          // Label shown when viewing a prior period
+          if (!isViewingCurrent)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'Records to current period',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
                 ),
               ),
-            ],
+            ),
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.33,
+            height: 48,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade300,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 1,
+                padding: EdgeInsets.zero,
+              ),
+              onPressed: onPressed,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: iconColor, size: 22),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -927,7 +1057,7 @@ class TimeEntryTile extends StatelessWidget {
         child: ListTile(
           dense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           leading: Container(
             width: 28,
             height: 28,
@@ -937,9 +1067,9 @@ class TimeEntryTile extends StatelessWidget {
             ),
             child: const Icon(Icons.check, color: Colors.white, size: 16),
           ),
-          title: Text('$startStr → $endStr'),
+          title: Text('$startStr → $endStr', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
           subtitle: segment.notes != null && segment.notes!.trim().isNotEmpty
-              ? Text(segment.notes!.trim())
+              ? Text(segment.notes!.trim(), style: const TextStyle(fontSize: 16))
               : null,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -948,6 +1078,7 @@ class TimeEntryTile extends StatelessWidget {
                 '$hoursStr h',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
+                  fontSize: 18,
                 ),
               ),
               const SizedBox(width: 8),
