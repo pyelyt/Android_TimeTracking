@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import '../models/pay_period_settings.dart';
 
 Map<String, DateTime> computePayPeriodRange(PayPeriodSettings settings, {DateTime? now}) {
@@ -80,9 +79,6 @@ Map<String, DateTime> computePayPeriodRange(PayPeriodSettings settings, {DateTim
   start = DateTime(start.year, start.month, start.day);
   end = DateTime(end.year, end.month, end.day);
 
-  if (kDebugMode) {
-    // ignore: avoid_print
-  }
 
   return {"start": start, "end": end};
 }

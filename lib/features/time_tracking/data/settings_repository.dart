@@ -1,6 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pay_period_settings.dart';
-import 'package:flutter/foundation.dart'; // debugPrint
 
 class SettingsRepository {
   static const _keyMode = 'pay_period_mode';
@@ -11,9 +10,6 @@ class SettingsRepository {
     final prefs = await SharedPreferences.getInstance();
 
     await prefs.setString(_keyMode, settings.mode.name);
-    debugPrint(
-        'SettingsRepository.saveSettings: mode=${settings.mode.name}, anchor=${settings.anchorDate}, middle=${settings.middleDay}');
-
     if (settings.anchorDate != null) {
       await prefs.setString(
         _keyAnchorDate,
@@ -36,9 +32,6 @@ class SettingsRepository {
     final modeString = prefs.getString(_keyMode);
     final anchorString = prefs.getString(_keyAnchorDate);
     final middleDay = prefs.getInt(_keyMiddleDay);
-    debugPrint(
-        'SettingsRepository.loadSettings: raw modeString=$modeString, anchorString=$anchorString, middleDay=$middleDay');
-
     if (modeString == null) return null;
 
     PayPeriodMode mode;

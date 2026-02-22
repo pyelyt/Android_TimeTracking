@@ -285,7 +285,6 @@ class _PayPeriodOnboardingScreenState
 
       if (mounted) Navigator.of(context).pop(true);
     } else {
-      debugPrint('PayPeriodOnboarding: no changes, not saving');
       if (mounted) Navigator.of(context).pop(false);
     }
   }

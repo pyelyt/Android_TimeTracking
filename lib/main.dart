@@ -12,7 +12,7 @@ import 'package:worktime_tracker/features/time_tracking/ui/screens/pay_period_on
 import 'package:worktime_tracker/features/time_tracking/ui/screens/add_session_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver =
-    RouteObserver<ModalRoute<void>>();
+RouteObserver<ModalRoute<void>>();
 
 Future<Database> _openDatabase() async {
   final dbPath = await getDatabasesPath();
@@ -63,6 +63,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'WorkTime Tracker',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
@@ -73,8 +74,8 @@ class MyApp extends StatelessWidget {
       home: initialSettings == null
           ? const PayPeriodOnboardingScreen()
           : TimeTrackingScreen(
-              repository: repository,
-            ),
+        repository: repository,
+      ),
     );
   }
 }

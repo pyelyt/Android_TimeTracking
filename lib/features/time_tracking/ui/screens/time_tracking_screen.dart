@@ -2,7 +2,6 @@
 
 import 'package:worktime_tracker/features/time_tracking/utils/pay_period_utils.dart';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -204,10 +203,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       _cachedGrandTotalHours = total;
     });
 
-    if (kDebugMode) {
-      // ignore: avoid_print
-      print('TimeTracking: initialized');
-    }
   }
 
   @override
@@ -261,10 +256,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       _cachedGrandTotalHours = total;
     });
 
-    if (kDebugMode) {
-      // ignore: avoid_print
-      print('TimeTracking: sessions reloaded');
-    }
   }
 
   void _refresh() {
@@ -400,6 +391,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                 await exporter.exportAndShare();
               } catch (e) {
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Export failed: $e')),
                 );
@@ -415,6 +407,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
               if (result == true) {
                 final s = await _settingsRepo.loadSettings();
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 setState(() {
                   _settings = s ?? PayPeriodSettings(mode: PayPeriodMode.weekly);
                   _currentPayPeriodRange = computePayPeriodRange(_settings!);
@@ -838,9 +831,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
                           widget.repository.removeSession(originalSession);
 
-                          Navigator.of(context).pop();
-
                           if (!mounted) return;
+                          // ignore: use_build_context_synchronously
+                          Navigator.of(context).pop();
+                          // ignore: use_build_context_synchronously
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                                 content: Text('Session deleted')),
@@ -905,6 +899,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                   .removeSession(originalSession);
                               widget.repository.addSession(updatedSession);
 
+                              // ignore: use_build_context_synchronously
                               Navigator.of(context).pop();
 
                               if (!mounted) return;
