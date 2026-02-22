@@ -30,7 +30,6 @@ Future<Database> _openDatabase() async {
           notes   TEXT
         )
       ''');
-      // Index on start for fast lookups and ordering
       await db.execute(
           'CREATE INDEX idx_sessions_start ON sessions (start)');
     },
@@ -40,10 +39,7 @@ Future<Database> _openDatabase() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Open SQLite database
   final db = await _openDatabase();
-
-  // Load saved pay period settings
   final settingsRepo = SettingsRepository();
   final settings = await settingsRepo.loadSettings();
 

@@ -14,6 +14,8 @@ import 'package:worktime_tracker/features/time_tracking/models/pay_period_settin
 
 // Import the routeObserver you added to main.dart
 import 'package:worktime_tracker/main.dart' show routeObserver;
+import 'package:worktime_tracker/features/time_tracking/ui/screens/dashboard_screen.dart';
+import 'package:worktime_tracker/features/time_tracking/services/csv_export_service.dart';
 
 /// Public DTO for a session segment (one calendar-day constrained piece of a WorkSession).
 class SessionSegment {
@@ -300,8 +302,50 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Time Tracking'),
+        title: const Text('WorkTime Tracker'),
+        backgroundColor: const Color(0xFF00796B),
+        foregroundColor: Colors.white,
         actions: [
+          // Dashboard icon
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: 'Hours Dashboard',
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => DashboardScreen(
+                  repository: widget.repository,
+                  settings: _settings,
+                ),
+              ));
+            },
+          ),
+          // CSV export icon
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Export CSV',
+            onPressed: () async {
+              if (_settings == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Pay period settings not loaded yet.')),
+                );
+                return;
+              }
+              try {
+                final exporter = CsvExportService(
+                  repository: widget.repository,
+                  settings: _settings!,
+                );
+                await exporter.exportAndShare();
+              } catch (e) {
+                if (!mounted) return;
+                // ignore: use_build_context_synchronously
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Export failed: $e')),
+                );
+              }
+            },
+          ),
+          // Settings icon
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () async {
@@ -350,41 +394,111 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   Widget _buildHeader(double grandTotalHours, bool hasOpen) {
     final totalStr = grandTotalHours.toStringAsFixed(2);
 
-    String payPeriodText = '';
+    String periodRange = '';
     if (_settings != null && _currentPayPeriodRange != null) {
       final start = _currentPayPeriodRange!['start'];
       final end = _currentPayPeriodRange!['end'];
       if (start != null && end != null) {
-        final startStr = _payPeriodFormatter.format(start);
-        final endStr = _payPeriodFormatter.format(end);
-        payPeriodText = 'Pay Period: $startStr – $endStr';
+        periodRange =
+            '${_payPeriodFormatter.format(start)} – ${_payPeriodFormatter.format(end)}';
       }
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    const Color accentTeal = Color(0xFF00796B);
+    const Color cardBg = Color(0xFFF5F7F9);
+
+    return Container(
+      color: cardBg,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (_settings != null)
-            Text(
-              payPeriodText,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          if (_settings != null) const SizedBox(height: 6),
-          Text(
-            'THIS PAY PERIOD TOTAL: $totalStr hrs',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+          // Left side: pay period label + date range
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PAY PERIOD',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  periodRange.isNotEmpty ? periodRange : '—',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A2E),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Session status pill
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: hasOpen
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFEEEEEE),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: hasOpen
+                              ? const Color(0xFF43A047)
+                              : Colors.grey.shade400,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        hasOpen ? 'Shift in progress' : 'No open shift',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: hasOpen
+                              ? const Color(0xFF2E7D32)
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Open session: ${hasOpen ? 'Yes' : 'No'}',
-            style: Theme.of(context).textTheme.bodyMedium,
+          // Right side: big hours total
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                totalStr,
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  color: accentTeal,
+                  height: 1.0,
+                ),
+              ),
+              const Text(
+                'hrs this period',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF78909C),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -558,6 +672,72 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                       contextMenuBuilder: null,
                     ),
                     const SizedBox(height: 12),
+                    // Delete button
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.delete_outline,
+                            color: Colors.red, size: 18),
+                        label: const Text(
+                          'Delete Session',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                        ),
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogCtx) => AlertDialog(
+                              title: const Text('Delete Session'),
+                              content: const Text(
+                                  'Are you sure you want to delete this session? This cannot be undone.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogCtx).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogCtx).pop(true),
+                                  child: const Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed != true) return;
+
+                          setState(() {
+                            final mutable = [..._sessions];
+                            mutable.removeWhere(
+                                (s) => s.start == originalSession.start);
+                            _sessions = mutable;
+                            _cachedDayGroups = _buildDayGroups(
+                                _sessions, _findOpenSession(_sessions));
+                            _cachedGrandTotalHours =
+                                _computeGrandTotalHours(_sessions);
+                          });
+
+                          widget.repository.removeSession(originalSession);
+                          if (!mounted) return;
+                          // ignore: use_build_context_synchronously
+                          Navigator.of(context).pop();
+                          // ignore: use_build_context_synchronously
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Session deleted')),
+                          );
+
+                          Future.microtask(_loadSessions);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -594,7 +774,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                               setState(() {
                                 final mutable = [..._sessions];
                                 final idx = mutable.indexWhere((s) =>
-                                s.start == originalSession.start);
+                                    s.start == originalSession.start);
                                 if (idx != -1) {
                                   mutable[idx] = updatedSession;
                                 } else {
@@ -650,7 +830,16 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
         child: ListTile(
           dense: true,
           contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: Color(0xFF43A047),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.play_arrow, color: Colors.white, size: 18),
+          ),
           title: Text('$startStr → In progress'),
           subtitle: const Text('Current session'),
           trailing: Text(
@@ -738,7 +927,16 @@ class TimeEntryTile extends StatelessWidget {
         child: ListTile(
           dense: true,
           contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E88E5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Colors.white, size: 16),
+          ),
           title: Text('$startStr → $endStr'),
           subtitle: segment.notes != null && segment.notes!.trim().isNotEmpty
               ? Text(segment.notes!.trim())
