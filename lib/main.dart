@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:worktime_tracker/features/time_tracking/ui/screens/time_tracking_screen.dart';
 import 'package:worktime_tracker/features/time_tracking/data/work_session_repository.dart';

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 enum PayPeriodMode {
   weekly,
   biWeekly,
@@ -22,7 +20,7 @@ class PayPeriodSettings {
 
   Map<String, dynamic> toMap() {
     return {
-      'mode': describeEnum(mode),
+      'mode': mode.name,
       'anchorDate': anchorDate?.toIso8601String(),
       'middleDay': middleDay,
     };
@@ -36,7 +34,7 @@ class PayPeriodSettings {
 
     return PayPeriodSettings(
       mode: PayPeriodMode.values.firstWhere(
-            (m) => describeEnum(m) == map['mode'],
+            (m) => m.name == map['mode'],
         orElse: () => PayPeriodMode.weekly,
       ),
       anchorDate: map['anchorDate'] != null

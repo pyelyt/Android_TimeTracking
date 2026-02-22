@@ -1,3 +1,5 @@
+// lib/features/time_tracking/ui/screens/time_tracking_screen.dart
+
 import 'package:worktime_tracker/features/time_tracking/utils/pay_period_utils.dart';
 
 import 'package:flutter/foundation.dart';
@@ -13,14 +15,14 @@ import 'package:worktime_tracker/features/time_tracking/models/pay_period_settin
 // Import the routeObserver you added to main.dart
 import 'package:worktime_tracker/main.dart' show routeObserver;
 
-/// Represents a portion of a WorkSession that falls within a single calendar day.
-class _SessionSegment {
+/// Public DTO for a session segment (one calendar-day constrained piece of a WorkSession).
+class SessionSegment {
   final DateTime date; // midnight-based date (year, month, day)
   final DateTime start;
   final DateTime end;
   final String? notes;
 
-  _SessionSegment({
+  SessionSegment({
     required this.date,
     required this.start,
     required this.end,
@@ -36,7 +38,7 @@ class _SessionSegment {
 /// Represents all segments for a single calendar day.
 class _DayGroup {
   final DateTime date;
-  final List<_SessionSegment> segments;
+  final List<SessionSegment> segments;
 
   _DayGroup({
     required this.date,
@@ -48,10 +50,10 @@ class _DayGroup {
   }
 }
 
-/// Split a WorkSession into one or more _SessionSegment objects,
+/// Split a WorkSession into one or more SessionSegment objects,
 /// each constrained to a single calendar day (overnight splitting).
-List<_SessionSegment> _splitSessionIntoSegments(WorkSession session) {
-  final List<_SessionSegment> segments = [];
+List<SessionSegment> _splitSessionIntoSegments(WorkSession session) {
+  final List<SessionSegment> segments = [];
 
   if (session.end == null) {
     return segments;
@@ -71,7 +73,7 @@ List<_SessionSegment> _splitSessionIntoSegments(WorkSession session) {
     finalEnd.isBefore(endOfDay) ? finalEnd : endOfDay;
 
     segments.add(
-      _SessionSegment(
+      SessionSegment(
         date: DateTime(currentStart.year, currentStart.month, currentStart.day),
         start: currentStart,
         end: segmentEnd,
@@ -90,7 +92,7 @@ List<_DayGroup> _buildDayGroups(
     List<WorkSession> sessions, WorkSession? openSession) {
   final sorted = [...sessions]..sort((a, b) => a.start.compareTo(b.start));
 
-  final Map<DateTime, List<_SessionSegment>> byDate = {};
+  final Map<DateTime, List<SessionSegment>> byDate = {};
 
   for (final session in sorted) {
     final segments = _splitSessionIntoSegments(session);
@@ -153,40 +155,29 @@ class TimeTrackingScreen extends StatefulWidget {
 }
 
 class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware {
-  // initialize to an empty list to avoid late initialization issues during rebuilds
   List<WorkSession> _sessions = [];
 
   PayPeriodSettings? _settings;
   final SettingsRepository _settingsRepo = SettingsRepository();
 
-  // Cached pay period range to avoid recomputing on every build
   Map<String, DateTime>? _currentPayPeriodRange;
 
-  // Cached formatters to avoid allocating on every build
   final DateFormat _payPeriodFormatter = DateFormat('MM/dd/yyyy');
   final DateFormat _dayHeaderFormatter = DateFormat('EEEE, MMM d');
   final DateFormat _timeFormatter = DateFormat('h:mm a');
 
-  // Cached derived values to keep build cheap
   List<_DayGroup> _cachedDayGroups = [];
   double _cachedGrandTotalHours = 0.0;
 
   @override
   void initState() {
     super.initState();
-    // Batch-load settings and sessions after the first frame to minimize startup jank.
     WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
   }
 
-  /// Initialize settings first, then schedule session loading.
   Future<void> _initialize() async {
-    final settingsStopwatch = Stopwatch()..start();
     final s = await _settingsRepo.loadSettings();
-    settingsStopwatch.stop();
-
-    final sessionsStopwatch = Stopwatch()..start();
     final sessions = await widget.repository.getAllAsync();
-    sessionsStopwatch.stop();
 
     if (!mounted) return;
 
@@ -205,9 +196,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     if (kDebugMode) {
       // ignore: avoid_print
-      print('TimeTracking: loadSettings=${settingsStopwatch.elapsedMilliseconds}ms; '
-          'getAllAsync=${sessionsStopwatch.elapsedMilliseconds}ms; '
-          'process=${(groups.isEmpty && total == 0.0) ? 0 : 1}ms');
+      print('TimeTracking: initialized');
     }
   }
 
@@ -242,18 +231,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   }
 
   Future<void> _loadSessions() async {
-    final stopwatch = Stopwatch()..start();
-
-    final repoStopwatch = Stopwatch()..start();
     final sessions = await widget.repository.getAllAsync();
-    repoStopwatch.stop();
-
     if (!mounted) return;
 
-    final processStopwatch = Stopwatch()..start();
     final groups = _buildDayGroups(sessions, _findOpenSession(sessions));
     final total = _computeGrandTotalHours(sessions);
-    processStopwatch.stop();
 
     setState(() {
       _sessions = sessions;
@@ -261,13 +243,9 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       _cachedGrandTotalHours = total;
     });
 
-    stopwatch.stop();
-
     if (kDebugMode) {
       // ignore: avoid_print
-      print('TimeTracking: loadSessions: total=${stopwatch.elapsedMilliseconds}ms; '
-          'repo=${repoStopwatch.elapsedMilliseconds}ms; '
-          'process=${processStopwatch.elapsedMilliseconds}ms');
+      print('TimeTracking: sessions reloaded');
     }
   }
 
@@ -275,7 +253,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     Future.microtask(_loadSessions);
   }
 
-  // Optimistic start: update UI immediately, persist in background, then reconcile.
   void _startSession() {
     final now = DateTime.now();
     final newSession = WorkSession(start: now, notes: null);
@@ -283,22 +260,20 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     _refresh();
   }
 
-  // Optimistic end: update model locally, persist in background, then reconcile.
   void _endSession() {
     final open = _findOpenSession(_sessions);
     if (open == null) return;
 
-    // If WorkSession fields are immutable, create a new instance with the updated end.
     final updated = WorkSession(
       start: open.start,
       end: DateTime.now(),
       notes: open.notes,
     );
-    // Replace locally and persist
+
     setState(() {
-      // create a mutable copy before modifying
       final mutable = [..._sessions];
-      final idx = mutable.indexWhere((s) => identical(s, open) || (s.start == open.start && s.end == open.end));
+      final idx = mutable.indexWhere(
+              (s) => identical(s, open) || (s.start == open.start && s.end == open.end));
       if (idx != -1) {
         mutable[idx] = updated;
       } else {
@@ -308,7 +283,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       _cachedDayGroups = _buildDayGroups(_sessions, _findOpenSession(_sessions));
       _cachedGrandTotalHours = _computeGrandTotalHours(_sessions);
     });
-    widget.repository.updateSession(updated);
+
+    // Persist: remove original, add updated
+    widget.repository.removeSession(open);
+    widget.repository.addSession(updated);
+
     _refresh();
   }
 
@@ -317,7 +296,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     final grandTotalHours = _cachedGrandTotalHours;
     final openSession = _findOpenSession(_sessions);
     final hasOpen = openSession != null;
-
     final dayGroups = _cachedDayGroups;
 
     return Scaffold(
@@ -328,7 +306,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             icon: const Icon(Icons.settings),
             onPressed: () async {
               final result = await Navigator.of(context).pushNamed('/pay-period-setup');
-
+              if (!mounted) return;
               if (result == true) {
                 final s = await _settingsRepo.loadSettings();
                 if (!mounted) return;
@@ -353,21 +331,15 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                 : ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: dayGroups.length,
-              // Reduce per-item compositing and keep-alive overhead
               addRepaintBoundaries: false,
               addAutomaticKeepAlives: false,
               cacheExtent: 200.0,
               itemBuilder: (context, index) {
                 final dayGroup = dayGroups[index];
-                return _buildDaySection(
-                  context,
-                  dayGroup,
-                  openSession,
-                );
+                return _buildDaySection(context, dayGroup, openSession);
               },
             ),
           ),
-
           const Divider(height: 1),
           _buildSingleStartEndButton(context, openSession),
         ],
@@ -380,9 +352,13 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     String payPeriodText = '';
     if (_settings != null && _currentPayPeriodRange != null) {
-      final startStr = _payPeriodFormatter.format(_currentPayPeriodRange!['start']!);
-      final endStr = _payPeriodFormatter.format(_currentPayPeriodRange!['end']!);
-      payPeriodText = 'Pay Period: $startStr – $endStr';
+      final start = _currentPayPeriodRange!['start'];
+      final end = _currentPayPeriodRange!['end'];
+      if (start != null && end != null) {
+        final startStr = _payPeriodFormatter.format(start);
+        final endStr = _payPeriodFormatter.format(end);
+        payPeriodText = 'Pay Period: $startStr – $endStr';
+      }
     }
 
     return Padding(
@@ -443,62 +419,47 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
               ),
             ),
           ),
-
-          // Closed sessions
-          ...dayGroup.segments.map((segment) => _buildSessionTile(context, segment)),
-
-          // Always show open session row under today's header
-          if (isToday && openSession != null) _buildOpenSessionRow(context, openSession),
+          ...dayGroup.segments
+              .map((segment) => _buildSessionTile(context, segment)),
+          if (isToday) _buildOpenSessionRow(context, openSession),
         ],
       ),
     );
   }
 
-  // Use the extracted widget with a stable key so Flutter can preserve tiles across parent rebuilds.
-  Widget _buildSessionTile(BuildContext context, _SessionSegment segment) {
+  Widget _buildSessionTile(BuildContext context, SessionSegment segment) {
     return TimeEntryTile(
-      key: ValueKey('${segment.date.toIso8601String()}_${segment.start.toIso8601String()}'),
+      key: ValueKey(
+          '${segment.date.toIso8601String()}_${segment.start.toIso8601String()}'),
       segment: segment,
       onEdit: (seg) => _showEditSessionSheet(context, seg),
     );
   }
 
-  // Step B: modal editor for a session segment
-  Future<void> _showEditSessionSheet(BuildContext context, _SessionSegment segment) async {
-    // Try to find the original WorkSession that produced this segment.
+  Future<void> _showEditSessionSheet(
+      BuildContext context, SessionSegment segment) async {
+    // Match strictly by start time — start is the unique key for a session.
     WorkSession? session;
     try {
-      session = _sessions.firstWhere((s) =>
-      s.start == segment.start ||
-          (s.end != null && segment.end == s.end) ||
-          (s.notes != null && s.notes == segment.notes)
-      );
+      session = _sessions.firstWhere((s) => s.start == segment.start);
     } catch (_) {
-      // If we can't find an exact match, fall back to the first session that overlaps the segment date.
-      try {
-        session = _sessions.firstWhere((s) =>
-        s.start.year == segment.date.year &&
-            s.start.month == segment.date.month &&
-            s.start.day == segment.date.day
-        );
-      } catch (_) {
-        session = null;
-      }
+      session = null;
     }
 
     if (session == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to locate session to edit.')),
       );
       return;
     }
 
+    // Capture original session for repository removal later
+    final originalSession = session;
+
     DateTime editedStart = session.start;
     DateTime? editedEnd = session.end;
     final notesController = TextEditingController(text: session.notes ?? '');
-
-    // Intentionally avoid modifying the system clipboard to prevent "Copied" overlays.
-    // Instead, reduce keyboard suggestions and disable interactive paste/copy in the notes field.
 
     await showModalBottomSheet(
       context: context,
@@ -511,16 +472,20 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           child: StatefulBuilder(
             builder: (context, setModalState) {
               Future<void> pickDateTime(bool isStart) async {
-                final initial = isStart ? editedStart : (editedEnd ?? editedStart);
+                final ctx = context; // capture before any await
+                final initial =
+                isStart ? editedStart : (editedEnd ?? editedStart);
                 final pickedDate = await showDatePicker(
-                  context: context,
+                  context: ctx,
                   initialDate: initial,
                   firstDate: DateTime(2000),
                   lastDate: DateTime(2100),
                 );
                 if (pickedDate == null) return;
+                if (!mounted) return;
                 final pickedTime = await showTimePicker(
-                  context: context,
+                  // ignore: use_build_context_synchronously
+                  context: ctx,
                   initialTime: TimeOfDay.fromDateTime(initial),
                 );
                 if (pickedTime == null) return;
@@ -549,7 +514,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                   children: [
                     Row(
                       children: [
-                        Expanded(child: Text('Edit Session', style: Theme.of(context).textTheme.titleMedium)),
+                        Expanded(
+                            child: Text('Edit Session',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium)),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.of(context).pop(),
@@ -567,33 +536,26 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     ),
                     ListTile(
                       title: const Text('End'),
-                      subtitle: Text(editedEnd != null ? fmt(editedEnd!) : 'In progress'),
+                      subtitle: Text(editedEnd != null
+                          ? fmt(editedEnd!)
+                          : 'In progress'),
                       trailing: TextButton(
                         onPressed: () => pickDateTime(false),
                         child: const Text('Change'),
                       ),
                     ),
-                    // Notes TextField: disable suggestions and autofill and disable
-                    // interactive paste/copy to avoid filename/clipboard suggestions appearing.
                     TextField(
                       controller: notesController,
                       decoration: const InputDecoration(labelText: 'Notes'),
                       maxLines: null,
-                      keyboardType: TextInputType.text,
+                      keyboardType: TextInputType.visiblePassword, // suppresses suggestion/clipboard bar on Android
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.done,
                       autocorrect: false,
                       enableSuggestions: false,
                       autofillHints: const <String>[],
-                      // Disable interactive selection so the keyboard won't surface paste suggestions.
                       enableInteractiveSelection: false,
-                      // Disable toolbar options (copy/cut/paste/selectAll)
-                      toolbarOptions: const ToolbarOptions(
-                        copy: false,
-                        cut: false,
-                        paste: false,
-                        selectAll: false,
-                      ),
+                      contextMenuBuilder: null,
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -609,59 +571,55 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                           child: ElevatedButton(
                             onPressed: () {
                               // Validate
-                              if (editedEnd != null && editedEnd!.isBefore(editedStart)) {
+                              if (editedEnd != null &&
+                                  editedEnd!.isBefore(editedStart)) {
+                                if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('End must be after start.')),
+                                  const SnackBar(
+                                      content: Text(
+                                          'End must be after start.')),
                                 );
                                 return;
                               }
 
-                              // Build a new WorkSession instance with the edited values.
-                              // IMPORTANT: If your WorkSession requires additional fields
-                              // (for example an id or projectId), include them here by copying
-                              // from the original `session` (e.g. id: session.id).
                               final updatedSession = WorkSession(
                                 start: editedStart,
                                 end: editedEnd,
-                                notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                                notes: notesController.text.trim().isEmpty
+                                    ? null
+                                    : notesController.text.trim(),
                               );
 
-                              // Replace the old session in the local list with the updated one
+                              // Update local state
                               setState(() {
                                 final mutable = [..._sessions];
-                                final idx = mutable.indexWhere((s) => identical(s, session) || (s.start == session!.start && (s.end == session.end)));
+                                final idx = mutable.indexWhere((s) =>
+                                s.start == originalSession.start);
                                 if (idx != -1) {
                                   mutable[idx] = updatedSession;
                                 } else {
-                                  // Fallback: if we couldn't find exact match, try replacing by date match
-                                  final idxByDate = mutable.indexWhere((s) =>
-                                  s.start.year == session!.start.year &&
-                                      s.start.month == session!.start.month &&
-                                      s.start.day == session!.start.day
-                                  );
-                                  if (idxByDate != -1) {
-                                    mutable[idxByDate] = updatedSession;
-                                  } else {
-                                    // If still not found, append (safe fallback)
-                                    mutable.add(updatedSession);
-                                  }
+                                  mutable.add(updatedSession);
                                 }
-
                                 _sessions = mutable;
-                                _cachedDayGroups = _buildDayGroups(_sessions, _findOpenSession(_sessions));
-                                _cachedGrandTotalHours = _computeGrandTotalHours(_sessions);
+                                _cachedDayGroups = _buildDayGroups(
+                                    _sessions, _findOpenSession(_sessions));
+                                _cachedGrandTotalHours =
+                                    _computeGrandTotalHours(_sessions);
                               });
 
-                              // Persist the updated session in background
-                              widget.repository.updateSession(updatedSession);
+                              // Persist: remove by original start, add updated
+                              widget.repository
+                                  .removeSession(originalSession);
+                              widget.repository.addSession(updatedSession);
 
                               Navigator.of(context).pop();
 
+                              if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Session updated')),
+                                const SnackBar(
+                                    content: Text('Session updated')),
                               );
 
-                              // Reconcile with repository in background
                               Future.microtask(_loadSessions);
                             },
                             child: const Text('Save'),
@@ -691,7 +649,8 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
         ),
         child: ListTile(
           dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           title: Text('$startStr → In progress'),
           subtitle: const Text('Current session'),
           trailing: Text(
@@ -705,9 +664,9 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     );
   }
 
-  Widget _buildSingleStartEndButton(BuildContext context, WorkSession? openSession) {
+  Widget _buildSingleStartEndButton(
+      BuildContext context, WorkSession? openSession) {
     final bool hasOpen = openSession != null;
-
     final String label = hasOpen ? 'End Shift' : 'Start Shift';
     final IconData icon = hasOpen ? Icons.stop : Icons.play_arrow;
     final Color iconColor = hasOpen ? Colors.red : Colors.green;
@@ -753,15 +712,15 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
 // --- Extracted widget for session rows ---
 class TimeEntryTile extends StatelessWidget {
-  final _SessionSegment segment;
-  final ValueChanged<_SessionSegment> onEdit;
+  final SessionSegment segment;
+  final ValueChanged<SessionSegment> onEdit;
   static final DateFormat _timeFmt = DateFormat('h:mm a');
 
   const TimeEntryTile({
+    super.key,
     required this.segment,
     required this.onEdit,
-    Key? key,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -778,7 +737,8 @@ class TimeEntryTile extends StatelessWidget {
         ),
         child: ListTile(
           dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           title: Text('$startStr → $endStr'),
           subtitle: segment.notes != null && segment.notes!.trim().isNotEmpty
               ? Text(segment.notes!.trim())

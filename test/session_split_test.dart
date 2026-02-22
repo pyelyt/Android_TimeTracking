@@ -1,8 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:worktime_tracker/features/time_tracking/models/work_session.dart';
 
+// Private DTO — only used within this test file.
+class _Seg {
+  final DateTime date;
+  final DateTime start;
+  final DateTime end;
+  _Seg({required this.date, required this.start, required this.end});
+}
+
 /// Local helper: split a WorkSession into day-constrained segments.
-List<_Seg> splitSessionIntoSegments(WorkSession session) {
+/// Private because it returns a private type (_Seg) and is only used in this file.
+List<_Seg> _splitSessionIntoSegments(WorkSession session) {
   final List<_Seg> segments = [];
   if (session.end == null) return segments;
   DateTime currentStart = session.start;
@@ -24,20 +33,13 @@ List<_Seg> splitSessionIntoSegments(WorkSession session) {
   return segments;
 }
 
-class _Seg {
-  final DateTime date;
-  final DateTime start;
-  final DateTime end;
-  _Seg({required this.date, required this.start, required this.end});
-}
-
 void main() {
   test('split overnight session into two segments', () {
     final start = DateTime(2026, 2, 10, 22, 30);
     final end = DateTime(2026, 2, 11, 1, 15);
     final session = WorkSession(start: start, end: end, notes: 'overnight');
 
-    final segments = splitSessionIntoSegments(session);
+    final segments = _splitSessionIntoSegments(session);
     expect(segments.length, 2);
     expect(segments[0].date, DateTime(2026, 2, 10));
     expect(segments[1].date, DateTime(2026, 2, 11));

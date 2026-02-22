@@ -61,8 +61,6 @@ class _PayPeriodOnboardingScreenState
         case PayPeriodMode.yearly:
           modeString = "D"; // fallback
           break;
-        default:
-          modeString = "A";
       }
 
       setState(() {
@@ -108,10 +106,7 @@ class _PayPeriodOnboardingScreenState
             ),
             const SizedBox(height: 16),
 
-            RadioListTile<String>(
-              title: const Text("A — Weekly (7‑day cycle)"),
-              subtitle: const Text("Sunday → Saturday"),
-              value: "A",
+            RadioGroup<String>(
               groupValue: _selectedMode,
               onChanged: (v) {
                 if (v == null) return;
@@ -120,58 +115,43 @@ class _PayPeriodOnboardingScreenState
                   _markDirty();
                 });
               },
-            ),
+              child: Column(
+                children: [
+                  RadioListTile<String>(
+                    title: const Text("A — Weekly (7‑day cycle)"),
+                    subtitle: const Text("Sunday → Saturday"),
+                    value: "A",
+                  ),
 
-            const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-            RadioListTile<String>(
-              title: const Text("B — Bi‑weekly (14‑day cycle)"),
-              subtitle: const Text("Requires selecting an anchor Sunday"),
-              value: "B",
-              groupValue: _selectedMode,
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _selectedMode = v;
-                  _markDirty();
-                });
-              },
-            ),
+                  RadioListTile<String>(
+                    title: const Text("B — Bi‑weekly (14‑day cycle)"),
+                    subtitle: const Text("Requires selecting an anchor Sunday"),
+                    value: "B",
+                  ),
 
-            if (_selectedMode == "B") _buildAnchorPicker(),
+                  if (_selectedMode == "B") _buildAnchorPicker(),
 
-            const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-            RadioListTile<String>(
-              title: const Text("C — Semi‑monthly"),
-              subtitle: const Text("Choose middle‑of‑month day"),
-              value: "C",
-              groupValue: _selectedMode,
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _selectedMode = v;
-                  _markDirty();
-                });
-              },
-            ),
+                  RadioListTile<String>(
+                    title: const Text("C — Semi‑monthly"),
+                    subtitle: const Text("Choose middle‑of‑month day"),
+                    value: "C",
+                  ),
 
-            if (_selectedMode == "C") _buildMiddleDayPicker(),
+                  if (_selectedMode == "C") _buildMiddleDayPicker(),
 
-            const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-            RadioListTile<String>(
-              title: const Text("D — Monthly"),
-              subtitle: const Text("No additional setup required"),
-              value: "D",
-              groupValue: _selectedMode,
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _selectedMode = v;
-                  _markDirty();
-                });
-              },
+                  RadioListTile<String>(
+                    title: const Text("D — Monthly"),
+                    subtitle: const Text("No additional setup required"),
+                    value: "D",
+                  ),
+                ],
+              ),
             ),
 
             const Spacer(),
@@ -209,18 +189,18 @@ class _PayPeriodOnboardingScreenState
               lastDate: DateTime(now.year + 5),
             );
 
-            if (picked != null) {
-              if (picked.weekday != DateTime.sunday) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Please select a Sunday.")),
-                );
-                return;
-              }
-              setState(() {
-                _selectedAnchorDate = DateTime(picked.year, picked.month, picked.day);
-                _markDirty();
-              });
+            if (picked == null) return;
+            if (!mounted) return;
+            if (picked.weekday != DateTime.sunday) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Please select a Sunday.")),
+              );
+              return;
             }
+            setState(() {
+              _selectedAnchorDate = DateTime(picked.year, picked.month, picked.day);
+              _markDirty();
+            });
           },
           child: Text(anchorText),
         ),

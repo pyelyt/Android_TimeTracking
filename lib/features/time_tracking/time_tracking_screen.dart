@@ -427,7 +427,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           ...dayGroup.segments.map((segment) => _buildSessionTile(context, segment)),
 
           // Always show open session row under today's header
-          if (isToday && openSession != null) _buildOpenSessionRow(context, openSession),
+          if (isToday) _buildOpenSessionRow(context, openSession),
         ],
       ),
     );
@@ -435,7 +435,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
   // Use the extracted widget with a stable key so Flutter can preserve tiles across parent rebuilds.
   Widget _buildSessionTile(BuildContext context, _SessionSegment segment) {
-    return TimeEntryTile(
+    return _TimeEntryTile(
       key: ValueKey('${segment.date.toIso8601String()}_${segment.start.toIso8601String()}'),
       segment: segment,
     );
@@ -515,13 +515,13 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
 // --- New extracted widget for session rows ---
 // Placed after the State class to keep the file organized.
-class TimeEntryTile extends StatelessWidget {
+class _TimeEntryTile extends StatelessWidget {
   final _SessionSegment segment;
 
-  const TimeEntryTile({
+  const _TimeEntryTile({
     required this.segment,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {

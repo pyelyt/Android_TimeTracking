@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pay_period_settings.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // debugPrint
 
 class SettingsRepository {
   static const _keyMode = 'pay_period_mode';
@@ -10,9 +10,9 @@ class SettingsRepository {
   Future<void> saveSettings(PayPeriodSettings settings) async {
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setString(_keyMode, describeEnum(settings.mode));
+    await prefs.setString(_keyMode, settings.mode.name);
     debugPrint(
-        'SettingsRepository.saveSettings: mode=${describeEnum(settings.mode)}, anchor=${settings.anchorDate}, middle=${settings.middleDay}');
+        'SettingsRepository.saveSettings: mode=${settings.mode.name}, anchor=${settings.anchorDate}, middle=${settings.middleDay}');
 
     if (settings.anchorDate != null) {
       await prefs.setString(
