@@ -12,12 +12,11 @@ import 'package:worktime_tracker/features/time_tracking/ui/screens/pay_period_on
 import 'package:worktime_tracker/features/time_tracking/ui/screens/add_session_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver =
-RouteObserver<ModalRoute<void>>();
+    RouteObserver<ModalRoute<void>>();
 
 Future<Database> _openDatabase() async {
   final dbPath = await getDatabasesPath();
   final path = p.join(dbPath, 'worktime_tracker.db');
-
   return openDatabase(
     path,
     version: 1,
@@ -38,18 +37,16 @@ Future<Database> _openDatabase() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   final db = await _openDatabase();
   final settingsRepo = SettingsRepository();
   final settings = await settingsRepo.loadSettings();
-
   runApp(MyApp(
     initialSettings: settings,
     repository: WorkSessionRepository(db),
   ));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final PayPeriodSettings? initialSettings;
   final WorkSessionRepository repository;
 
@@ -60,6 +57,25 @@ class MyApp extends StatelessWidget {
   });
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late bool _onboardingComplete;
+
+  @override
+  void initState() {
+    super.initState();
+    _onboardingComplete = widget.initialSettings != null;
+  }
+
+  void _completeOnboarding() {
+    setState(() {
+      _onboardingComplete = true;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'WorkTime Tracker',
@@ -67,15 +83,14 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
+      navigatorObservers: [routeObserver],
       routes: {
         '/pay-period-setup': (context) => const PayPeriodOnboardingScreen(),
         '/addSession': (context) => AddSessionScreen(),
       },
-      home: initialSettings == null
-          ? const PayPeriodOnboardingScreen()
-          : TimeTrackingScreen(
-        repository: repository,
-      ),
+      home: _onboardingComplete
+          ? TimeTrackingScreen(repository: widget.repository)
+          : PayPeriodOnboardingScreen(onComplete: _completeOnboarding),
     );
   }
 }

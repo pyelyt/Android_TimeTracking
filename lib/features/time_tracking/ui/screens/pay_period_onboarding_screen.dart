@@ -4,7 +4,8 @@ import '../../models/pay_period_settings.dart';
 import '../../data/settings_repository.dart';
 
 class PayPeriodOnboardingScreen extends StatefulWidget {
-  const PayPeriodOnboardingScreen({super.key});
+  final VoidCallback? onComplete;
+  const PayPeriodOnboardingScreen({super.key, this.onComplete});
 
   @override
   State<PayPeriodOnboardingScreen> createState() =>
@@ -283,7 +284,13 @@ class _PayPeriodOnboardingScreenState
     if (changed) {
       await _repo.saveSettings(newSettings);
 
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) {
+        if (widget.onComplete != null) {
+          widget.onComplete!();
+        } else if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+      }
     } else {
       if (mounted) Navigator.of(context).pop(false);
     }
