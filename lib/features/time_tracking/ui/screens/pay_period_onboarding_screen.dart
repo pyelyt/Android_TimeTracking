@@ -96,7 +96,7 @@ class _PayPeriodOnboardingScreenState
 
     return Scaffold(
       appBar: AppBar(title: const Text("Pay Period Setup")),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,7 +155,7 @@ class _PayPeriodOnboardingScreenState
               ),
             ),
 
-            const Spacer(),
+            const SizedBox(height: 32),
 
             Center(
               child: ElevatedButton(
