@@ -880,8 +880,8 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                               }
 
                               // Check for future times
-                              final now = DateTime.now().toUtc();
-                              if (editedStart.isAfter(now)) {
+                              final now = DateTime.now();
+                              if (editedStart.toLocal().isAfter(now)) {
                                 if (!mounted) return;
                                 showDialog(
                                   context: context,
@@ -899,7 +899,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                 );
                                 return;
                               }
-                              if (editedEnd != null && editedEnd!.isAfter(now)) {
+                              if (editedEnd != null && editedEnd!.toLocal().isAfter(now)) {
                                 if (!mounted) return;
                                 showDialog(
                                   context: context,
