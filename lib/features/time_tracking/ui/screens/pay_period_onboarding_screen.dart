@@ -159,7 +159,31 @@ class _PayPeriodOnboardingScreenState
 
             Center(
               child: ElevatedButton(
-                onPressed: _isValid ? _save : null,
+                onPressed: () {
+                  if (!_isValid) {
+                    String message = "";
+                    if (_selectedMode == "B") {
+                      message = "Please select an anchor Sunday before continuing.";
+                    } else if (_selectedMode == "C") {
+                      message = "Please select a middle-of-month day before continuing.";
+                    }
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text("Setup Incomplete"),
+                        content: Text(message),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text("OK"),
+                          ),
+                        ],
+                      ),
+                    );
+                    return;
+                  }
+                  _save();
+                },
                 child: const Text("Continue"),
               ),
             ),
@@ -193,8 +217,18 @@ class _PayPeriodOnboardingScreenState
             if (picked == null) return;
             if (!mounted) return;
             if (picked.weekday != DateTime.sunday) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Please select a Sunday.")),
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text("Invalid Date"),
+                  content: const Text("Please select a Sunday as the anchor date."),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text("OK"),
+                    ),
+                  ],
+                ),
               );
               return;
             }

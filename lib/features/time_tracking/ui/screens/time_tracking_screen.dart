@@ -684,10 +684,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom,
           ),
           child: StatefulBuilder(
             builder: (context, setModalState) {
@@ -861,14 +862,87 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                               if (editedEnd != null &&
                                   editedEnd!.isBefore(editedStart)) {
                                 if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'End must be after start.')),
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Invalid Session Time'),
+                                    content: const Text(
+                                      'End time must be later than the start time. Please adjust the times.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
                                 );
                                 return;
                               }
 
+                              // Check for future times
+                              final now = DateTime.now().toUtc();
+                              if (editedStart.isAfter(now)) {
+                                if (!mounted) return;
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Invalid Start Time'),
+                                    content: const Text(
+                                      'Start time cannot be set to a future date and time. Please enter a valid past time.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+                              if (editedEnd != null && editedEnd!.isAfter(now)) {
+                                if (!mounted) return;
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Invalid End Time'),
+                                    content: const Text(
+                                      'End time cannot be set to a future date and time. Please enter a valid past time.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+                              // Check for overlaps with other sessions
+                              final editedEndTime = editedEnd ?? DateTime.now().toUtc();
+                              final hasOverlap = _sessions.any((s) {
+                                if (s.start == originalSession.start) return false;
+                                final sEnd = s.end ?? DateTime.now().toUtc();
+                                return editedStart.isBefore(sEnd) &&
+                                    editedEndTime.isAfter(s.start);
+                              });
+                              if (hasOverlap) {
+                                if (!mounted) return;
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Overlapping Session'),
+                                    content: const Text(
+                                      'This session overlaps with an existing session. Please adjust the start or end time.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
                               final updatedSession = WorkSession(
                                 start: editedStart,
                                 end: editedEnd,
