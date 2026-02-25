@@ -307,7 +307,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   }
 
   void _startSession() {
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
     final newSession = WorkSession(start: now, notes: null);
     widget.repository.addSession(newSession);
     _refresh();
@@ -319,7 +319,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     final updated = WorkSession(
       start: open.start,
-      end: DateTime.now(),
+      end: DateTime.now().toUtc(),
       notes: open.notes,
     );
 

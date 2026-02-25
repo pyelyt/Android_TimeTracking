@@ -25,9 +25,9 @@ class WorkSession {
   factory WorkSession.fromMap(Map<String, dynamic> map) {
     return WorkSession(
       id: map['id'] as int?,
-      start: DateTime.fromMillisecondsSinceEpoch(map['start'] as int),
+      start: DateTime.fromMillisecondsSinceEpoch(map['start'] as int, isUtc: true).toLocal(),
       end: map['end'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['end'] as int)
+          ? DateTime.fromMillisecondsSinceEpoch(map['end'] as int, isUtc: true).toLocal()
           : null,
       notes: map['notes'] as String?,
     );
