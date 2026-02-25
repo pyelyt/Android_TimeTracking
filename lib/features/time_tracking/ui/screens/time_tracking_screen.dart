@@ -969,9 +969,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     final Color iconColor = hasOpen ? Colors.red : Colors.green;
     final VoidCallback onPressed = hasOpen ? _endSession : _startSession;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(0, 6, 0, 14),
-      alignment: Alignment.center,
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(0, 6, 0, 14),
+        alignment: Alignment.center,
       child: Column(
         children: [
           // Label shown when viewing a prior period
@@ -1020,6 +1022,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           ),
         ],
       ),
+    ),
     );
   }
 }
