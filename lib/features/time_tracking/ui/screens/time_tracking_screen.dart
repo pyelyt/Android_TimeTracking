@@ -1125,7 +1125,7 @@ class TimeEntryTile extends StatelessWidget {
             ),
             child: const Icon(Icons.check, color: Colors.white, size: 16),
           ),
-          title: Text('$startStr → $endStr', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+          title: Text('$startStr → $endStr', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
           subtitle: segment.notes != null && segment.notes!.trim().isNotEmpty
               ? Text(segment.notes!.trim(), style: const TextStyle(fontSize: 16))
               : null,
@@ -1136,7 +1136,7 @@ class TimeEntryTile extends StatelessWidget {
                 '$hoursStr h',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  fontSize: 18,
+                  fontSize: 15,
                 ),
               ),
               const SizedBox(width: 8),

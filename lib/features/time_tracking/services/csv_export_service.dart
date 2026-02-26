@@ -14,7 +14,8 @@ class CsvExportService {
   final WorkSessionRepository repository;
   final PayPeriodSettings settings;
 
-  static final DateFormat _dtFmt = DateFormat('yyyy-MM-dd HH:mm');
+  static final DateFormat _dtFmt = DateFormat('M/d/yyyy HH:mm');
+  static final DateFormat _dateFmt = DateFormat('M/d/yyyy');
   static final DateFormat _fileDateFmt = DateFormat('yyyyMMdd');
 
   CsvExportService({required this.repository, required this.settings});
@@ -70,8 +71,8 @@ class CsvExportService {
   String _buildRow(
       DateTime periodStart, DateTime periodEnd, WorkSession session) {
     final cols = [
-      _csvCell(_dtFmt.format(periodStart)),
-      _csvCell(_dtFmt.format(periodEnd)),
+      _csvCell(_dateFmt.format(periodStart)),
+      _csvCell(_dateFmt.format(periodEnd)),
       _csvCell(_dtFmt.format(session.start)),
       _csvCell(_dtFmt.format(session.end!)),
       session.hoursDecimal.toStringAsFixed(2),
