@@ -22,11 +22,13 @@ class SessionSegment {
   final DateTime start;
   final DateTime end;
   final String? notes;
+  final WorkSession parentSession;
 
   SessionSegment({
     required this.date,
     required this.start,
     required this.end,
+    required this.parentSession,
     this.notes,
   });
 
@@ -79,6 +81,7 @@ List<SessionSegment> _splitSessionIntoSegments(WorkSession session) {
         start: currentStart,
         end: segmentEnd,
         notes: session.notes,
+        parentSession: session,
       ),
     );
 
@@ -658,28 +661,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
   Future<void> _showEditSessionSheet(
       BuildContext context, SessionSegment segment) async {
-    // Match strictly by start time — start is the unique key for a session.
-    WorkSession? session;
-    try {
-      session = _sessions.firstWhere((s) => s.start == segment.start);
-    } catch (_) {
-      session = null;
-    }
-
-    if (session == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to locate session to edit.')),
-      );
-      return;
-    }
-
-    // Capture original session for repository removal later
-    final originalSession = session;
-
-    DateTime editedStart = session.start;
-    DateTime? editedEnd = session.end;
-    final notesController = TextEditingController(text: session.notes ?? '');
+    // Use parentSession directly from segment
+    final originalSession = segment.parentSession;
+    DateTime editedStart = originalSession.start;
+    DateTime? editedEnd = originalSession.end;
+    final notesController = TextEditingController(text: originalSession.notes ?? '');
 
     await showModalBottomSheet(
       context: context,
