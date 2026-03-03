@@ -358,7 +358,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WorkTime Tracker', style: TextStyle(fontSize: 25.0, fontWeight: FontWeight.w600)),
+        title: const Text('WorkTime Tracker', style: TextStyle(fontSize: 17.0, fontWeight: FontWeight.w600)),
         backgroundColor: const Color(0xFF00796B),
         foregroundColor: Colors.white,
         actions: [
@@ -421,7 +421,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           ),
         ],
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 4),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(grandTotalHours, hasOpen, isViewingCurrent),
@@ -430,7 +433,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             child: dayGroups.isEmpty
                 ? const Center(child: Text('No sessions yet.'))
                 : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               itemCount: dayGroups.length,
               addRepaintBoundaries: false,
               addAutomaticKeepAlives: false,
@@ -444,6 +447,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           const Divider(height: 1),
           _buildSingleStartEndButton(context, openSession, isViewingCurrent),
         ],
+      ),
       ),
     );
   }
@@ -465,6 +469,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     const Color accentTeal = Color(0xFF00796B);
     const Color cardBg = Color(0xFFF5F7F9);
+    final sw = MediaQuery.of(context).size.width;
 
     return Container(
       color: cardBg,
@@ -502,7 +507,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     Text(
                       'PAY PERIOD',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: sw * 0.032,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.2,
                         color: Colors.grey.shade500,
@@ -534,8 +539,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                   padding: const EdgeInsets.only(left: 4),
                   child: Text(
                     periodRange.isNotEmpty ? periodRange : '—',
-                    style: const TextStyle(
-                      fontSize: 17,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: sw * 0.028,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF1A1A2E),
                     ),
@@ -572,7 +579,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                           Text(
                             hasOpen ? 'Shift in progress' : 'No open shift',
                             style: TextStyle(
-                              fontSize: 17,
+                              fontSize: sw * 0.032,
                               fontWeight: FontWeight.w600,
                               color: hasOpen
                                   ? const Color(0xFF2E7D32)
@@ -587,27 +594,30 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             ),
           ),
           // Right side: big hours total
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          SizedBox(
+            width: 125,
+            child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 totalStr,
-                style: const TextStyle(
-                  fontSize: 36,
+                style: TextStyle(
+                  fontSize: sw * 0.055,
                   fontWeight: FontWeight.w800,
                   color: accentTeal,
                   height: 1.0,
                 ),
               ),
-              const Text(
+              Text(
                 'hrs this period',
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: sw * 0.03,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF78909C),
                 ),
               ),
             ],
+          ),
           ),
         ],
       ),
@@ -725,7 +735,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                             child: Text('Edit Session',
                                 style: Theme.of(context)
                                     .textTheme
-                                    .titleMedium?.copyWith(fontSize: 24))),
+                                    .titleMedium?.copyWith(fontSize: 18))),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.of(context).pop(),
@@ -734,26 +744,26 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     ),
                     const SizedBox(height: 8),
                     ListTile(
-                      title: const Text('Start', style: TextStyle(fontSize: 21)),
-                      subtitle: Text(fmt(editedStart), style: const TextStyle(fontSize: 18)),
+                      title: const Text('Start', style: TextStyle(fontSize: 17)),
+                      subtitle: Text(fmt(editedStart), style: const TextStyle(fontSize: 15)),
                       trailing: TextButton(
                         onPressed: () => pickDateTime(true),
-                        child: const Text('Change', style: TextStyle(fontSize: 21)),
+                        child: const Text('Change', style: TextStyle(fontSize: 17)),
                       ),
                     ),
                     ListTile(
-                      title: const Text('End', style: TextStyle(fontSize: 21)),
+                      title: const Text('End', style: TextStyle(fontSize: 17)),
                       subtitle: Text(editedEnd != null
                           ? fmt(editedEnd!)
-                          : 'In progress', style: const TextStyle(fontSize: 18)),
+                          : 'In progress', style: const TextStyle(fontSize: 15)),
                       trailing: TextButton(
                         onPressed: () => pickDateTime(false),
-                        child: const Text('Change', style: TextStyle(fontSize: 21)),
+                        child: const Text('Change', style: TextStyle(fontSize: 17)),
                       ),
                     ),
                     TextField(
                       controller: notesController,
-                      decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(fontSize: 21)),
+                      decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(fontSize: 17)),
                       maxLines: null,
                       keyboardType: TextInputType.visiblePassword, // suppresses suggestion/clipboard bar on Android
                       textCapitalization: TextCapitalization.sentences,
@@ -774,7 +784,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                             color: Colors.red, size: 18),
                         label: const Text(
                           'Delete Session',
-                          style: TextStyle(color: Colors.red, fontSize: 21),
+                          style: TextStyle(color: Colors.red, fontSize: 17),
                         ),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.red),
@@ -837,7 +847,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Cancel', style: TextStyle(fontSize: 21)),
+                            child: const Text('Cancel', style: TextStyle(fontSize: 17)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -970,7 +980,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
                               Future.microtask(_loadSessions);
                             },
-                            child: const Text('Save', style: TextStyle(fontSize: 21)),
+                            child: const Text('Save', style: TextStyle(fontSize: 17)),
                           ),
                         ),
                       ],
@@ -987,6 +997,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
   Widget _buildOpenSessionRow(BuildContext context, WorkSession openSession) {
     final startStr = _timeFormatter.format(openSession.start);
+    final sw = MediaQuery.of(context).size.width;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -1001,14 +1012,14 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           leading: Container(
             width: 28,
-            height: 28,
+            height: 48,
             decoration: const BoxDecoration(
               color: Color(0xFF43A047),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.play_arrow, color: Colors.white, size: 18),
           ),
-          title: Text('$startStr → In progress', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+          title: Text('$startStr → In progress', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: sw * 0.03, fontWeight: FontWeight.w500)),
           subtitle: const Text('Current session'),
           trailing: Text(
             '-- h',
@@ -1029,13 +1040,12 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     final Color iconColor = hasOpen ? Colors.red : Colors.green;
     final VoidCallback onPressed = hasOpen ? _endSession : _startSession;
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(0, 6, 0, 14),
+    return Container(
+        padding: const EdgeInsets.only(top: 4, bottom: 4),
         alignment: Alignment.center,
-      child: Column(
-        children: [
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           // Label shown when viewing a prior period
           if (!isViewingCurrent)
             Padding(
@@ -1073,16 +1083,15 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     style: const TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: 10,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        ],
-      ),
-    ),
+          ],
+        ),
     );
   }
 }
@@ -1104,6 +1113,7 @@ class TimeEntryTile extends StatelessWidget {
     final startStr = _timeFmt.format(segment.start);
     final endStr = _timeFmt.format(segment.end);
     final hoursStr = segment.hoursDecimal.toStringAsFixed(2);
+    final sw = MediaQuery.of(context).size.width;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -1112,34 +1122,37 @@ class TimeEntryTile extends StatelessWidget {
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: ListTile(
-          dense: true,
-          contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          leading: Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E88E5),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.check, color: Colors.white, size: 16),
-          ),
-          title: Text('$startStr → $endStr', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-          subtitle: segment.notes != null && segment.notes!.trim().isNotEmpty
-              ? Text(segment.notes!.trim(), style: const TextStyle(fontSize: 16))
-              : null,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                '$hoursStr h',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
+              Container(
+                width: 28,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1E88E5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('$startStr → $endStr',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: sw * 0.03, fontWeight: FontWeight.w500)),
+                    if (segment.notes != null && segment.notes!.trim().isNotEmpty)
+                      Text(segment.notes!.trim(),
+                        style: TextStyle(fontSize: sw * 0.03, color: Colors.grey.shade600)),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
+              Text('$hoursStr h',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: sw * 0.03)),
               IconButton(
                 icon: const Icon(Icons.edit, size: 20),
                 tooltip: 'Edit session',
