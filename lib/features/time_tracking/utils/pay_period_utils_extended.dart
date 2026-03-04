@@ -36,13 +36,13 @@ class PeriodRange {
   PeriodRange({required this.label, required this.start, required this.end});
 }
 
-/// Returns the last [count] complete-or-current weekly ranges (Mon–Sun),
+/// Returns the last [count] complete-or-current weekly ranges (Sun–Sat),
 /// most recent last.
 List<PeriodRange> lastNWeeks(int count, {DateTime? now}) {
   final today = _today(now);
-  // Find the most recent Monday
-  final daysFromMonday = (today.weekday - 1) % 7;
-  final thisMonday = today.subtract(Duration(days: daysFromMonday));
+  // Find the most recent Sunday (weekday: Mon=1 ... Sun=7, so Sun=0 mod 7)
+  final daysFromSunday = today.weekday % 7;
+  final thisMonday = today.subtract(Duration(days: daysFromSunday));
 
   final List<PeriodRange> result = [];
   for (int i = count - 1; i >= 0; i--) {
