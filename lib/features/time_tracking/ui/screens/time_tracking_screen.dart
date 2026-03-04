@@ -43,10 +43,7 @@ class _DayGroup {
   final DateTime date;
   final List<SessionSegment> segments;
 
-  _DayGroup({
-    required this.date,
-    required this.segments,
-  });
+  _DayGroup({required this.date, required this.segments});
 
   double get totalHours {
     return segments.fold(0.0, (sum, s) => sum + s.hoursDecimal);
@@ -72,8 +69,9 @@ List<SessionSegment> _splitSessionIntoSegments(WorkSession session) {
       currentStart.day + 1,
     );
 
-    final DateTime segmentEnd =
-    finalEnd.isBefore(endOfDay) ? finalEnd : endOfDay;
+    final DateTime segmentEnd = finalEnd.isBefore(endOfDay)
+        ? finalEnd
+        : endOfDay;
 
     segments.add(
       SessionSegment(
@@ -93,7 +91,9 @@ List<SessionSegment> _splitSessionIntoSegments(WorkSession session) {
 
 /// Group all sessions into day-based groups, with overnight splitting applied.
 List<_DayGroup> _buildDayGroups(
-    List<WorkSession> sessions, WorkSession? openSession) {
+  List<WorkSession> sessions,
+  WorkSession? openSession,
+) {
   final sorted = [...sessions]..sort((a, b) => a.start.compareTo(b.start));
 
   final Map<DateTime, List<SessionSegment>> byDate = {};
@@ -107,21 +107,24 @@ List<_DayGroup> _buildDayGroups(
 
   // Ensure open session day exists even if no closed sessions exist
   if (openSession != null) {
-    final d = DateTime(openSession.start.year, openSession.start.month,
-        openSession.start.day);
+    final d = DateTime(
+      openSession.start.year,
+      openSession.start.month,
+      openSession.start.day,
+    );
     byDate.putIfAbsent(d, () => []);
   }
 
-  final List<_DayGroup> dayGroups = byDate.entries
-      .map(
-        (entry) => _DayGroup(
-      date: entry.key,
-      segments: entry.value
-        ..sort((a, b) => a.start.compareTo(b.start)),
-    ),
-  )
-      .toList()
-    ..sort((a, b) => a.date.compareTo(b.date));
+  final List<_DayGroup> dayGroups =
+      byDate.entries
+          .map(
+            (entry) => _DayGroup(
+              date: entry.key,
+              segments: entry.value..sort((a, b) => a.start.compareTo(b.start)),
+            ),
+          )
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
 
   return dayGroups;
 }
@@ -149,16 +152,14 @@ WorkSession? _findOpenSession(List<WorkSession> sessions) {
 class TimeTrackingScreen extends StatefulWidget {
   final WorkSessionRepository repository;
 
-  const TimeTrackingScreen({
-    super.key,
-    required this.repository,
-  });
+  const TimeTrackingScreen({super.key, required this.repository});
 
   @override
   State<TimeTrackingScreen> createState() => _TimeTrackingScreenState();
 }
 
-class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware {
+class _TimeTrackingScreenState extends State<TimeTrackingScreen>
+    with RouteAware {
   List<WorkSession> _sessions = [];
 
   PayPeriodSettings? _settings;
@@ -205,7 +206,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       _cachedDayGroups = groups;
       _cachedGrandTotalHours = total;
     });
-
   }
 
   @override
@@ -249,7 +249,9 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     final filtered = focused != null
         ? _filterSessionsByPeriod(sessions, focused)
         : sessions;
-    final openSession = _focusedPeriodOffset == 0 ? _findOpenSession(sessions) : null;
+    final openSession = _focusedPeriodOffset == 0
+        ? _findOpenSession(sessions)
+        : null;
     final groups = _buildDayGroups(filtered, openSession);
     final total = _computeGrandTotalHours(filtered);
 
@@ -258,7 +260,6 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       _cachedDayGroups = groups;
       _cachedGrandTotalHours = total;
     });
-
   }
 
   void _refresh() {
@@ -267,10 +268,18 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
   /// Filter sessions to those whose start falls within [period].
   List<WorkSession> _filterSessionsByPeriod(
-      List<WorkSession> sessions, Map<String, DateTime> period) {
+    List<WorkSession> sessions,
+    Map<String, DateTime> period,
+  ) {
     final start = period['start']!;
     final end = DateTime(
-        period['end']!.year, period['end']!.month, period['end']!.day, 23, 59, 59);
+      period['end']!.year,
+      period['end']!.month,
+      period['end']!.day,
+      23,
+      59,
+      59,
+    );
     return sessions
         .where((s) => !s.start.isBefore(start) && !s.start.isAfter(end))
         .toList();
@@ -329,14 +338,19 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     setState(() {
       final mutable = [..._sessions];
       final idx = mutable.indexWhere(
-              (s) => identical(s, open) || (s.start == open.start && s.end == open.end));
+        (s) =>
+            identical(s, open) || (s.start == open.start && s.end == open.end),
+      );
       if (idx != -1) {
         mutable[idx] = updated;
       } else {
         mutable.add(updated);
       }
       _sessions = mutable;
-      _cachedDayGroups = _buildDayGroups(_sessions, _findOpenSession(_sessions));
+      _cachedDayGroups = _buildDayGroups(
+        _sessions,
+        _findOpenSession(_sessions),
+      );
       _cachedGrandTotalHours = _computeGrandTotalHours(_sessions);
     });
 
@@ -358,7 +372,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WorkTime Tracker', style: TextStyle(fontSize: 17.0, fontWeight: FontWeight.w600)),
+        title: const Text(
+          'WorkTime Tracker',
+          style: TextStyle(fontSize: 17.0, fontWeight: FontWeight.w600),
+        ),
         backgroundColor: const Color(0xFF00796B),
         foregroundColor: Colors.white,
         actions: [
@@ -367,12 +384,14 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             icon: const Icon(Icons.bar_chart),
             tooltip: 'Hours Dashboard',
             onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => DashboardScreen(
-                  repository: widget.repository,
-                  settings: _settings,
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DashboardScreen(
+                    repository: widget.repository,
+                    settings: _settings,
+                  ),
                 ),
-              ));
+              );
             },
           ),
           // CSV export icon
@@ -382,7 +401,9 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             onPressed: () async {
               if (_settings == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Pay period settings not loaded yet.')),
+                  const SnackBar(
+                    content: Text('Pay period settings not loaded yet.'),
+                  ),
                 );
                 return;
               }
@@ -391,13 +412,16 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                   repository: widget.repository,
                   settings: _settings!,
                 );
-                await exporter.exportAndShare();
+                final box = context.findRenderObject() as RenderBox;
+                final origin = box.localToGlobal(Offset.zero) & box.size;
+
+                await exporter.exportAndShare(shareOrigin: origin);
               } catch (e) {
                 if (!mounted) return;
                 // ignore: use_build_context_synchronously
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Export failed: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
               }
             },
           ),
@@ -405,14 +429,17 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () async {
-              final result = await Navigator.of(context).pushNamed('/pay-period-setup');
+              final result = await Navigator.of(
+                context,
+              ).pushNamed('/pay-period-setup');
               if (!mounted) return;
               if (result == true) {
                 final s = await _settingsRepo.loadSettings();
                 if (!mounted) return;
                 // ignore: use_build_context_synchronously
                 setState(() {
-                  _settings = s ?? PayPeriodSettings(mode: PayPeriodMode.weekly);
+                  _settings =
+                      s ?? PayPeriodSettings(mode: PayPeriodMode.weekly);
                   _currentPayPeriodRange = computePayPeriodRange(_settings!);
                 });
                 Future.microtask(_loadSessions);
@@ -425,34 +452,38 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
         top: false,
         minimum: const EdgeInsets.only(bottom: 4),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(grandTotalHours, hasOpen, isViewingCurrent),
-          const Divider(height: 1),
-          Expanded(
-            child: dayGroups.isEmpty
-                ? const Center(child: Text('No sessions yet.'))
-                : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              itemCount: dayGroups.length,
-              addRepaintBoundaries: false,
-              addAutomaticKeepAlives: false,
-              cacheExtent: 200.0,
-              itemBuilder: (context, index) {
-                final dayGroup = dayGroups[index];
-                return _buildDaySection(context, dayGroup, openSession);
-              },
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(grandTotalHours, hasOpen, isViewingCurrent),
+            const Divider(height: 1),
+            Expanded(
+              child: dayGroups.isEmpty
+                  ? const Center(child: Text('No sessions yet.'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: dayGroups.length,
+                      addRepaintBoundaries: false,
+                      addAutomaticKeepAlives: false,
+                      cacheExtent: 200.0,
+                      itemBuilder: (context, index) {
+                        final dayGroup = dayGroups[index];
+                        return _buildDaySection(context, dayGroup, openSession);
+                      },
+                    ),
             ),
-          ),
-          const Divider(height: 1),
-          _buildSingleStartEndButton(context, openSession, isViewingCurrent),
-        ],
-      ),
+            const Divider(height: 1),
+            _buildSingleStartEndButton(context, openSession, isViewingCurrent),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeader(double grandTotalHours, bool hasOpen, bool isViewingCurrent) {
+  Widget _buildHeader(
+    double grandTotalHours,
+    bool hasOpen,
+    bool isViewingCurrent,
+  ) {
     final totalStr = grandTotalHours.toStringAsFixed(2);
 
     // Use focused range for display, fall back to current
@@ -463,7 +494,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       final end = displayRange['end'];
       if (start != null && end != null) {
         periodRange =
-        '${_payPeriodFormatter.format(start)} – ${_payPeriodFormatter.format(end)}';
+            '${_payPeriodFormatter.format(start)} – ${_payPeriodFormatter.format(end)}';
       }
     }
 
@@ -554,8 +585,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
                     child: Container(
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: hasOpen
                             ? const Color(0xFFE8F5E9)
@@ -597,27 +630,27 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
           SizedBox(
             width: 125,
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                totalStr,
-                style: TextStyle(
-                  fontSize: sw * 0.055,
-                  fontWeight: FontWeight.w800,
-                  color: accentTeal,
-                  height: 1.0,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  totalStr,
+                  style: TextStyle(
+                    fontSize: sw * 0.055,
+                    fontWeight: FontWeight.w800,
+                    color: accentTeal,
+                    height: 1.0,
+                  ),
                 ),
-              ),
-              Text(
-                'hrs this period',
-                style: TextStyle(
-                  fontSize: sw * 0.03,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF78909C),
+                Text(
+                  'hrs this period',
+                  style: TextStyle(
+                    fontSize: sw * 0.03,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF78909C),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
         ],
       ),
@@ -625,15 +658,16 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   }
 
   Widget _buildDaySection(
-      BuildContext context,
-      _DayGroup dayGroup,
-      WorkSession? openSession,
-      ) {
+    BuildContext context,
+    _DayGroup dayGroup,
+    WorkSession? openSession,
+  ) {
     final date = dayGroup.date;
     final headerText =
         '${_dayHeaderFormatter.format(date)} (${dayGroup.totalHours.toStringAsFixed(2)} hrs)';
 
-    final isToday = openSession != null &&
+    final isToday =
+        openSession != null &&
         date.year == openSession.start.year &&
         date.month == openSession.start.month &&
         date.day == openSession.start.day;
@@ -647,13 +681,14 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
               headerText,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
-          ...dayGroup.segments
-              .map((segment) => _buildSessionTile(context, segment)),
+          ...dayGroup.segments.map(
+            (segment) => _buildSessionTile(context, segment),
+          ),
           if (isToday) _buildOpenSessionRow(context, openSession),
         ],
       ),
@@ -663,19 +698,24 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   Widget _buildSessionTile(BuildContext context, SessionSegment segment) {
     return TimeEntryTile(
       key: ValueKey(
-          '${segment.date.toIso8601String()}_${segment.start.toIso8601String()}'),
+        '${segment.date.toIso8601String()}_${segment.start.toIso8601String()}',
+      ),
       segment: segment,
       onEdit: (seg) => _showEditSessionSheet(context, seg),
     );
   }
 
   Future<void> _showEditSessionSheet(
-      BuildContext context, SessionSegment segment) async {
+    BuildContext context,
+    SessionSegment segment,
+  ) async {
     // Use parentSession directly from segment
     final originalSession = segment.parentSession;
     DateTime editedStart = originalSession.start;
     DateTime? editedEnd = originalSession.end;
-    final notesController = TextEditingController(text: originalSession.notes ?? '');
+    final notesController = TextEditingController(
+      text: originalSession.notes ?? '',
+    );
 
     await showModalBottomSheet(
       context: context,
@@ -684,14 +724,17 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom,
+            bottom:
+                MediaQuery.of(ctx).viewInsets.bottom +
+                MediaQuery.of(ctx).padding.bottom,
           ),
           child: StatefulBuilder(
             builder: (context, setModalState) {
               Future<void> pickDateTime(bool isStart) async {
                 final ctx = context; // capture before any await
-                final initial =
-                isStart ? editedStart : (editedEnd ?? editedStart);
+                final initial = isStart
+                    ? editedStart
+                    : (editedEnd ?? editedStart);
                 final pickedDate = await showDatePicker(
                   context: ctx,
                   initialDate: initial,
@@ -732,10 +775,13 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     Row(
                       children: [
                         Expanded(
-                            child: Text('Edit Session',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium?.copyWith(fontSize: 18))),
+                          child: Text(
+                            'Edit Session',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.titleMedium?.copyWith(fontSize: 13),
+                          ),
+                        ),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.of(context).pop(),
@@ -744,28 +790,45 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     ),
                     const SizedBox(height: 8),
                     ListTile(
-                      title: const Text('Start', style: TextStyle(fontSize: 17)),
-                      subtitle: Text(fmt(editedStart), style: const TextStyle(fontSize: 15)),
+                      title: const Text(
+                        'Start',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      subtitle: Text(
+                        fmt(editedStart),
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       trailing: TextButton(
                         onPressed: () => pickDateTime(true),
-                        child: const Text('Change', style: TextStyle(fontSize: 17)),
+                        child: const Text(
+                          'Change',
+                          style: TextStyle(fontSize: 13),
+                        ),
                       ),
                     ),
                     ListTile(
-                      title: const Text('End', style: TextStyle(fontSize: 17)),
-                      subtitle: Text(editedEnd != null
-                          ? fmt(editedEnd!)
-                          : 'In progress', style: const TextStyle(fontSize: 15)),
+                      title: const Text('End', style: TextStyle(fontSize: 13)),
+                      subtitle: Text(
+                        editedEnd != null ? fmt(editedEnd!) : 'In progress',
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       trailing: TextButton(
                         onPressed: () => pickDateTime(false),
-                        child: const Text('Change', style: TextStyle(fontSize: 17)),
+                        child: const Text(
+                          'Change',
+                          style: TextStyle(fontSize: 13),
+                        ),
                       ),
                     ),
                     TextField(
                       controller: notesController,
-                      decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(fontSize: 17)),
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        labelStyle: TextStyle(fontSize: 13),
+                      ),
                       maxLines: null,
-                      keyboardType: TextInputType.visiblePassword, // suppresses suggestion/clipboard bar on Android
+                      keyboardType: TextInputType
+                          .visiblePassword, // suppresses suggestion/clipboard bar on Android
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.done,
                       autocorrect: false,
@@ -780,11 +843,14 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.delete_outline,
-                            color: Colors.red, size: 18),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 18,
+                        ),
                         label: const Text(
                           'Delete Session',
-                          style: TextStyle(color: Colors.red, fontSize: 17),
+                          style: TextStyle(color: Colors.red, fontSize: 13),
                         ),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.red),
@@ -795,7 +861,8 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                             builder: (dialogCtx) => AlertDialog(
                               title: const Text('Delete Session'),
                               content: const Text(
-                                  'Are you sure you want to delete this session? This cannot be undone.'),
+                                'Are you sure you want to delete this session? This cannot be undone.',
+                              ),
                               actions: [
                                 TextButton(
                                   onPressed: () =>
@@ -818,12 +885,16 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                           setState(() {
                             final mutable = [..._sessions];
                             mutable.removeWhere(
-                                    (s) => s.start == originalSession.start);
+                              (s) => s.start == originalSession.start,
+                            );
                             _sessions = mutable;
                             _cachedDayGroups = _buildDayGroups(
-                                _sessions, _findOpenSession(_sessions));
-                            _cachedGrandTotalHours =
-                                _computeGrandTotalHours(_sessions);
+                              _sessions,
+                              _findOpenSession(_sessions),
+                            );
+                            _cachedGrandTotalHours = _computeGrandTotalHours(
+                              _sessions,
+                            );
                           });
 
                           widget.repository.removeSession(originalSession);
@@ -833,8 +904,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                           Navigator.of(context).pop();
                           // ignore: use_build_context_synchronously
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Session deleted')),
+                            const SnackBar(content: Text('Session deleted')),
                           );
 
                           Future.microtask(_loadSessions);
@@ -847,7 +917,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Cancel', style: TextStyle(fontSize: 17)),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(fontSize: 13),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -863,10 +936,12 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                   builder: (ctx) => AlertDialog(
                                     title: const Text('Invalid Session Time'),
                                     content: const Text(
-                                      'End time must be later than the start time. Please adjust the times.'),
+                                      'End time must be later than the start time. Please adjust the times.',
+                                    ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(),
                                         child: const Text('OK'),
                                       ),
                                     ],
@@ -884,10 +959,12 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                   builder: (ctx) => AlertDialog(
                                     title: const Text('Invalid Start Time'),
                                     content: const Text(
-                                      'Start time cannot be set to a future date and time. Please enter a valid past time.'),
+                                      'Start time cannot be set to a future date and time. Please enter a valid past time.',
+                                    ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(),
                                         child: const Text('OK'),
                                       ),
                                     ],
@@ -895,17 +972,20 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                 );
                                 return;
                               }
-                              if (editedEnd != null && editedEnd!.toLocal().isAfter(now)) {
+                              if (editedEnd != null &&
+                                  editedEnd!.toLocal().isAfter(now)) {
                                 if (!mounted) return;
                                 showDialog(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
                                     title: const Text('Invalid End Time'),
                                     content: const Text(
-                                      'End time cannot be set to a future date and time. Please enter a valid past time.'),
+                                      'End time cannot be set to a future date and time. Please enter a valid past time.',
+                                    ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(),
                                         child: const Text('OK'),
                                       ),
                                     ],
@@ -914,9 +994,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                 return;
                               }
                               // Check for overlaps with other sessions
-                              final editedEndTime = editedEnd ?? DateTime.now().toUtc();
+                              final editedEndTime =
+                                  editedEnd ?? DateTime.now().toUtc();
                               final hasOverlap = _sessions.any((s) {
-                                if (s.start == originalSession.start) return false;
+                                if (s.start == originalSession.start)
+                                  return false;
                                 final sEnd = s.end ?? DateTime.now().toUtc();
                                 return editedStart.isBefore(sEnd) &&
                                     editedEndTime.isAfter(s.start);
@@ -928,10 +1010,12 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                   builder: (ctx) => AlertDialog(
                                     title: const Text('Overlapping Session'),
                                     content: const Text(
-                                      'This session overlaps with an existing session. Please adjust the start or end time.'),
+                                      'This session overlaps with an existing session. Please adjust the start or end time.',
+                                    ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(),
                                         child: const Text('OK'),
                                       ),
                                     ],
@@ -950,8 +1034,9 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                               // Update local state
                               setState(() {
                                 final mutable = [..._sessions];
-                                final idx = mutable.indexWhere((s) =>
-                                s.start == originalSession.start);
+                                final idx = mutable.indexWhere(
+                                  (s) => s.start == originalSession.start,
+                                );
                                 if (idx != -1) {
                                   mutable[idx] = updatedSession;
                                 } else {
@@ -959,14 +1044,15 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                                 }
                                 _sessions = mutable;
                                 _cachedDayGroups = _buildDayGroups(
-                                    _sessions, _findOpenSession(_sessions));
+                                  _sessions,
+                                  _findOpenSession(_sessions),
+                                );
                                 _cachedGrandTotalHours =
                                     _computeGrandTotalHours(_sessions);
                               });
 
                               // Persist: remove by original start, add updated
-                              widget.repository
-                                  .removeSession(originalSession);
+                              widget.repository.removeSession(originalSession);
                               widget.repository.addSession(updatedSession);
 
                               // ignore: use_build_context_synchronously
@@ -975,12 +1061,16 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('Session updated')),
+                                  content: Text('Session updated'),
+                                ),
                               );
 
                               Future.microtask(_loadSessions);
                             },
-                            child: const Text('Save', style: TextStyle(fontSize: 17)),
+                            child: const Text(
+                              'Save',
+                              style: TextStyle(fontSize: 13),
+                            ),
                           ),
                         ),
                       ],
@@ -1008,8 +1098,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
         ),
         child: ListTile(
           dense: true,
-          contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 4,
+          ),
           leading: Container(
             width: 28,
             height: 48,
@@ -1019,13 +1111,17 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
             ),
             child: const Icon(Icons.play_arrow, color: Colors.white, size: 18),
           ),
-          title: Text('$startStr → In progress', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: sw * 0.03, fontWeight: FontWeight.w500)),
+          title: Text(
+            '$startStr → In progress',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: sw * 0.03, fontWeight: FontWeight.w500),
+          ),
           subtitle: const Text('Current session'),
           trailing: Text(
             '-- h',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
       ),
@@ -1033,7 +1129,10 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
   }
 
   Widget _buildSingleStartEndButton(
-      BuildContext context, WorkSession? openSession, bool isViewingCurrent) {
+    BuildContext context,
+    WorkSession? openSession,
+    bool isViewingCurrent,
+  ) {
     final bool hasOpen = openSession != null;
     final String label = hasOpen ? 'End Shift' : 'Start Shift';
     final IconData icon = hasOpen ? Icons.stop : Icons.play_arrow;
@@ -1041,11 +1140,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
     final VoidCallback onPressed = hasOpen ? _endSession : _startSession;
 
     return Container(
-        padding: const EdgeInsets.only(top: 4, bottom: 4),
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           // Label shown when viewing a prior period
           if (!isViewingCurrent)
             Padding(
@@ -1090,8 +1189,8 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen> with RouteAware
               ),
             ),
           ),
-          ],
-        ),
+        ],
+      ),
     );
   }
 }
@@ -1102,11 +1201,7 @@ class TimeEntryTile extends StatelessWidget {
   final ValueChanged<SessionSegment> onEdit;
   static final DateFormat _timeFmt = DateFormat('h:mm a');
 
-  const TimeEntryTile({
-    super.key,
-    required this.segment,
-    required this.onEdit,
-  });
+  const TimeEntryTile({super.key, required this.segment, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -1142,17 +1237,33 @@ class TimeEntryTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('$startStr → $endStr',
+                    Text(
+                      '$startStr → $endStr',
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: sw * 0.03, fontWeight: FontWeight.w500)),
-                    if (segment.notes != null && segment.notes!.trim().isNotEmpty)
-                      Text(segment.notes!.trim(),
-                        style: TextStyle(fontSize: sw * 0.03, color: Colors.grey.shade600)),
+                      style: TextStyle(
+                        fontSize: sw * 0.03,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (segment.notes != null &&
+                        segment.notes!.trim().isNotEmpty)
+                      Text(
+                        segment.notes!.trim(),
+                        style: TextStyle(
+                          fontSize: sw * 0.03,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              Text('$hoursStr h',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: sw * 0.03)),
+              Text(
+                '$hoursStr h',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: sw * 0.03,
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.edit, size: 20),
                 tooltip: 'Edit session',

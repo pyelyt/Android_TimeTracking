@@ -9,6 +9,8 @@ import '../data/work_session_repository.dart';
 import '../models/pay_period_settings.dart';
 import '../models/work_session.dart';
 import '../utils/pay_period_utils_extended.dart';
+import 'package:flutter/material.dart';
+
 
 class CsvExportService {
   final WorkSessionRepository repository;
@@ -22,7 +24,7 @@ class CsvExportService {
 
   /// Build the last 3 pay periods, filter sessions into them,
   /// generate CSV content, write to a temp file, and trigger share sheet.
-  Future<void> exportAndShare() async {
+  Future<void> exportAndShare({required Rect shareOrigin}) async {
     final allSessions = await repository.getAllAsync();
 
     // Get last 3 pay periods (oldest first)
@@ -32,22 +34,32 @@ class CsvExportService {
 
     // Header row
     buffer.writeln(
-        'Pay Period Start,Pay Period End,Session Start,Session End,Duration (hrs),Notes');
+      'Pay Period Start,Pay Period End,Session Start,Session End,Duration (hrs),Notes',
+    );
 
     for (final period in periods) {
       final periodStart = period['start']!;
       final periodEnd = period['end']!;
-      final periodEndFull =
-          DateTime(periodEnd.year, periodEnd.month, periodEnd.day, 23, 59, 59);
+      final periodEndFull = DateTime(
+        periodEnd.year,
+        periodEnd.month,
+        periodEnd.day,
+        23,
+        59,
+        59,
+      );
 
       // Filter sessions whose start falls within this period
-      final periodSessions = allSessions
-          .where((s) =>
-              s.end != null &&
-              !s.start.isBefore(periodStart) &&
-              !s.start.isAfter(periodEndFull))
-          .toList()
-        ..sort((a, b) => a.start.compareTo(b.start));
+      final periodSessions =
+          allSessions
+              .where(
+                (s) =>
+                    s.end != null &&
+                    !s.start.isBefore(periodStart) &&
+                    !s.start.isAfter(periodEndFull),
+              )
+              .toList()
+            ..sort((a, b) => a.start.compareTo(b.start));
 
       for (final session in periodSessions) {
         buffer.writeln(_buildRow(periodStart, periodEnd, session));
@@ -56,8 +68,7 @@ class CsvExportService {
 
     // Write to temp file
     final dir = await getTemporaryDirectory();
-    final fileName =
-        'worktime_${_fileDateFmt.format(DateTime.now())}.csv';
+    final fileName = 'worktime_${_fileDateFmt.format(DateTime.now())}.csv';
     final file = File('${dir.path}/$fileName');
     await file.writeAsString(buffer.toString());
 
@@ -65,11 +76,15 @@ class CsvExportService {
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'text/csv')],
       subject: 'WorkTime Export – Last 3 Pay Periods',
+      sharePositionOrigin: shareOrigin,
     );
   }
 
   String _buildRow(
-      DateTime periodStart, DateTime periodEnd, WorkSession session) {
+    DateTime periodStart,
+    DateTime periodEnd,
+    WorkSession session,
+  ) {
     final cols = [
       _csvCell(_dateFmt.format(periodStart)),
       _csvCell(_dateFmt.format(periodEnd)),
