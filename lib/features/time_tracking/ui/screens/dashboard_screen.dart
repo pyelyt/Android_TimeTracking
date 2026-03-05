@@ -44,15 +44,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  /// Sum hours for all closed sessions whose start falls within [start, end].
+  /// Sum hours for all closed sessions that overlap [start, end], clipping to boundaries.
   double _hoursInRange(DateTime start, DateTime end) {
     double total = 0;
-    final rangeEnd = DateTime(end.year, end.month, end.day, 23, 59, 59);
+    final rangeEnd = DateTime(end.year, end.month, end.day + 1);
     for (final s in _sessions) {
       if (s.end == null) continue;
-      if (!s.start.isBefore(start) && !s.start.isAfter(rangeEnd)) {
-        total += s.hoursDecimal;
-      }
+      final sStart = s.start.toLocal();
+      final sEnd = s.end!.toLocal();
+      // Skip sessions that don't overlap with range at all
+      if (!sStart.isBefore(rangeEnd) || !sEnd.isAfter(start)) continue;
+      // Clip to range boundaries
+      final clippedStart = sStart.isBefore(start) ? start : sStart;
+      final clippedEnd = sEnd.isAfter(rangeEnd) ? rangeEnd : sEnd;
+      total += clippedEnd.difference(clippedStart).inMinutes / 60.0;
     }
     return total;
   }

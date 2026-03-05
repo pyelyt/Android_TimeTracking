@@ -41,28 +41,30 @@ class CsvExportService {
       final periodStart = period['start']!;
       final periodEnd = period['end']!;
       final periodEndFull = DateTime(
-        periodEnd.year,
-        periodEnd.month,
-        periodEnd.day,
-        23,
-        59,
-        59,
-      );
+        periodEnd.year, periodEnd.month, periodEnd.day + 1);
 
-      // Filter sessions whose start falls within this period
-      final periodSessions =
-          allSessions
-              .where(
-                (s) =>
-                    s.end != null &&
-                    !s.start.isBefore(periodStart) &&
-                    !s.start.isAfter(periodEndFull),
-              )
-              .toList()
-            ..sort((a, b) => a.start.compareTo(b.start));
+      // Filter sessions that overlap with this period
+      final periodSessions = allSessions
+          .where((s) =>
+              s.end != null &&
+              s.start.toLocal().isBefore(periodEndFull) &&
+              s.end!.toLocal().isAfter(periodStart))
+          .toList()
+        ..sort((a, b) => a.start.compareTo(b.start));
 
       for (final session in periodSessions) {
-        buffer.writeln(_buildRow(periodStart, periodEnd, session));
+        // Clip session to period boundaries
+        final clippedStart = session.start.toLocal().isBefore(periodStart)
+            ? periodStart
+            : session.start.toLocal();
+        final clippedEnd = session.end!.toLocal().isAfter(periodEndFull)
+            ? periodEndFull
+            : session.end!.toLocal();
+        final clippedHours = clippedEnd.difference(clippedStart).inMinutes / 60.0;
+        buffer.writeln(_buildRow(periodStart, periodEnd, session,
+            clippedStart: clippedStart,
+            clippedEnd: clippedEnd,
+            clippedHours: clippedHours));
       }
     }
 
@@ -83,14 +85,20 @@ class CsvExportService {
   String _buildRow(
     DateTime periodStart,
     DateTime periodEnd,
-    WorkSession session,
-  ) {
+    WorkSession session, {
+    DateTime? clippedStart,
+    DateTime? clippedEnd,
+    double? clippedHours,
+  }) {
+    final start = clippedStart ?? session.start.toLocal();
+    final end = clippedEnd ?? session.end!.toLocal();
+    final hours = clippedHours ?? session.hoursDecimal;
     final cols = [
       _csvCell(_dateFmt.format(periodStart)),
       _csvCell(_dateFmt.format(periodEnd)),
-      _csvCell(_dtFmt.format(session.start)),
-      _csvCell(_dtFmt.format(session.end!)),
-      session.hoursDecimal.toStringAsFixed(2),
+      _csvCell(_dtFmt.format(start)),
+      _csvCell(_dtFmt.format(end)),
+      hours.toStringAsFixed(2),
       _csvCell(session.notes ?? ''),
     ];
     return cols.join(',');

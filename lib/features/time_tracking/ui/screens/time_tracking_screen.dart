@@ -59,8 +59,8 @@ List<SessionSegment> _splitSessionIntoSegments(WorkSession session) {
     return segments;
   }
 
-  DateTime currentStart = session.start;
-  final DateTime finalEnd = session.end!;
+  DateTime currentStart = session.start.toLocal();
+  final DateTime finalEnd = session.end!.toLocal();
 
   while (currentStart.isBefore(finalEnd)) {
     final DateTime endOfDay = DateTime(
@@ -92,15 +92,25 @@ List<SessionSegment> _splitSessionIntoSegments(WorkSession session) {
 /// Group all sessions into day-based groups, with overnight splitting applied.
 List<_DayGroup> _buildDayGroups(
   List<WorkSession> sessions,
-  WorkSession? openSession,
-) {
+  WorkSession? openSession, {
+  Map<String, DateTime>? period,
+}) {
   final sorted = [...sessions]..sort((a, b) => a.start.compareTo(b.start));
 
   final Map<DateTime, List<SessionSegment>> byDate = {};
 
+  // Period boundary dates for filtering segments
+  final DateTime? periodStart = period?['start'];
+  final DateTime? periodEnd = period != null ? DateTime(
+    period['end']!.year, period['end']!.month, period['end']!.day + 1) : null;
+
   for (final session in sorted) {
     final segments = _splitSessionIntoSegments(session);
     for (final seg in segments) {
+      // Only include segments whose date falls within the period
+      if (periodStart != null && periodEnd != null) {
+        if (seg.date.isBefore(periodStart) || !seg.date.isBefore(periodEnd)) continue;
+      }
       byDate.putIfAbsent(seg.date, () => []).add(seg);
     }
   }
@@ -130,11 +140,23 @@ List<_DayGroup> _buildDayGroups(
 }
 
 /// Compute the grand total hours across all (closed) sessions.
-double _computeGrandTotalHours(List<WorkSession> sessions) {
+double _computeGrandTotalHours(List<WorkSession> sessions, {Map<String, DateTime>? period}) {
   double total = 0.0;
   for (final session in sessions) {
     if (session.end != null) {
-      total += session.hoursDecimal;
+      if (period != null) {
+        final periodStart = period['start']!;
+        final periodEnd = DateTime(
+          period['end']!.year, period['end']!.month, period['end']!.day + 1);
+        // Clip session to period boundaries
+        final clippedStart = session.start.isBefore(periodStart) ? periodStart : session.start;
+        final clippedEnd = session.end!.isAfter(periodEnd) ? periodEnd : session.end!;
+        if (clippedEnd.isAfter(clippedStart)) {
+          total += clippedEnd.difference(clippedStart).inMinutes / 60.0;
+        }
+      } else {
+        total += session.hoursDecimal;
+      }
     }
   }
   return total;
@@ -252,8 +274,8 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen>
     final openSession = _focusedPeriodOffset == 0
         ? _findOpenSession(sessions)
         : null;
-    final groups = _buildDayGroups(filtered, openSession);
-    final total = _computeGrandTotalHours(filtered);
+    final groups = _buildDayGroups(filtered, openSession, period: focused);
+    final total = _computeGrandTotalHours(filtered, period: focused);
 
     setState(() {
       _sessions = sessions;
@@ -281,7 +303,11 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen>
       59,
     );
     return sessions
-        .where((s) => !s.start.isBefore(start) && !s.start.isAfter(end))
+        .where((s) {
+          final sEnd = s.end ?? DateTime.now();
+          // Include session if it overlaps with the period at all
+          return s.start.isBefore(end) && sEnd.isAfter(start);
+        })
         .toList();
   }
 
@@ -822,6 +848,7 @@ class _TimeTrackingScreenState extends State<TimeTrackingScreen>
                     ),
                     TextField(
                       controller: notesController,
+                      style: const TextStyle(fontSize: 13),
                       decoration: const InputDecoration(
                         labelText: 'Notes',
                         labelStyle: TextStyle(fontSize: 13),
