@@ -1238,14 +1238,14 @@ class TimeEntryTile extends StatelessWidget {
     final sw = MediaQuery.of(context).size.width;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      padding: const EdgeInsets.only(left: 16, right: 4, top: 2, bottom: 2),
       child: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.only(left: 12, right: 4, top: 4, bottom: 4),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1285,10 +1285,11 @@ class TimeEntryTile extends StatelessWidget {
                 ),
               ),
               Text(
-                '$hoursStr h',
+                ' $hoursStr h',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: sw * 0.03,
+                  color: Color(0xFF00897B),
                 ),
               ),
               IconButton(
